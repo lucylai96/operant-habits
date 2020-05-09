@@ -1,0 +1,24 @@
+function [outcomes] = contingency_world(sch, action, rate, t)
+% to simulate the world, either a VR or a VI schedule
+% sch = 0 indicates VR schedule
+% sch = 1 indicates VI schedule
+
+%% todo
+% VI world emits outcomes irrespective of actions
+% VR world emits outcomes based on actions 
+
+%% VR world
+if sch == 0
+    
+
+
+%% VI world
+elseif sch == 1
+    % outcomes are just a poisson process
+    outcomes = poisson;
+    rate = 
+    
+end
+
+
+end
