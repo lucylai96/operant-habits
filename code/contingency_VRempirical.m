@@ -13,26 +13,7 @@ function contingency_VRempirical
 %
 map = brewermap(9,'Blues');
 set(0, 'DefaultAxesColorOrder', map([3,5,7,9],:)) % first three rows
-%
-% figure(1); subplot 121;
-% histogram(VI.waitTimes,50)
-% title('interval wait times (VI)') % mean(VI.waitTimes)
-% prettyplot
-% % still need to calculate when rewards are actually observed by the
-% % agent (this is within the loop)
-%
-% %% VR schedule
-% ratio = 10; % avg required number of presses before reward
-% [VR.numActions] = contingency_generateVR(ratio);
-%
-% map = brewermap(9,'Reds');
-% set(0, 'DefaultAxesColorOrder', map(3:2:9,:)) % first three rows
-%
-% figure(1); subplot 122;
-% histogram(VR.numActions,50);
-% title('num actions required (VR)')
-% prettyplot
-% equalabscissa(1,2)
+
 
 %% new agent
 T = 7200; % timesteps
@@ -250,14 +231,19 @@ for r = 1:length(ratio)
     end
 end
 
+%% test
+FR.HO = 1-log(FR.lambda_o);
+VR.HO = 1-log(FR.lambda_o);
 %% calculate information
 FR.I = FR.HO-FR.HOA;
 VR.I = VR.HO-VR.HOA;
 
+
+
 %% plots
 figure; hold on;
 subplot 221; hold on;
-plot(la,VR.lambda_o)
+plot(la,VR.lambda_o,'LineWidth', 1.5)
 % plot(a',beta','LineWidth'4, 1.5)
 % text(1.5,90, 'less habit','FontSize',14)
 % text(1.5,10, 'more habit','FontSize',14)
@@ -266,7 +252,7 @@ ylabel('outcome rate \lambda_o')
 % ylabel('resource constraint \beta')
 axis square
 % axis([0 2 0 100])
-legend('VR1','VR2','VR5','VR10','VR20')
+legend('VR2','VR5','VR10','VR20')
 legend('boxoff')
 prettyplot
 
@@ -276,7 +262,7 @@ plot(la',VR.HO','--','LineWidth', 1.5);
 plot(la',VR.HOA','LineWidth', 1.5)
 xlabel('action rate \lambda_a')
 ylabel('conditional entropy H_{O|A}')
-legend('VR1','VR2','VR5','VR10','VR20','Location','southeast')
+legend('VR2','VR5','VR10','VR20','Location','southeast')
 legend('boxoff')
 axis([0 1 0 5])
 axis square
@@ -309,7 +295,7 @@ suptitle('VR')
 %% FR
 figure; hold on;
 subplot 221; hold on;
-plot(la,FR.lambda_o)
+plot(la,FR.lambda_o,'LineWidth', 1.5)
 % plot(a',beta','LineWidth'4, 1.5)
 % text(1.5,90, 'less habit','FontSize',14)
 % text(1.5,10, 'more habit','FontSize',14)
@@ -318,7 +304,7 @@ ylabel('outcome rate \lambda_o')
 % ylabel('resource constraint \beta')
 axis square
 % axis([0 2 0 100])
-legend('FR1','FR2','FR5','FR10','FR20')
+legend('FR2','FR5','FR10','FR20')
 legend('boxoff')
 prettyplot
 
@@ -328,7 +314,7 @@ plot(la',FR.HO','--','LineWidth', 1.5);
 plot(la',FR.HOA','LineWidth', 1.5)
 xlabel('action rate \lambda_a')
 ylabel('conditional entropy H_{O|A}')
-legend('FR1','FR2','FR5','FR10','FR20','Location','southeast')
+legend('FR2','FR5','FR10','FR20','Location','southeast')
 legend('boxoff')
 axis([0 1 0 5])
 axis square
@@ -388,31 +374,13 @@ legend('boxoff')
 suptitle ('FR')
 
 
-figure; 
-subplot 222; plot(FR.waitTimeMean,VR.waitTimeMean,'.'); dline;xlabel('FR wait time');ylabel('VR wait time');prettyplot;% mean of the inter-outcome interval for diff action rates. this 1/lambda_o
-subplot 223; plot(FR.meanNumAct,VR.meanNumAct,'.'); dline;xlabel('FR mean num actions');ylabel('VR mean number actions');prettyplot; % mean number of actions till reward 
-subplot 224; plot(FR.meanATO,VR.meanATO,'.'); dline;xlabel('FR mean of H_{O|A}');ylabel('VR mean of H_{O|A}');prettyplot; % mean number of actions till reward 
+%figure; 
+%subplot 222; plot(FR.waitTimeMean,VR.waitTimeMean,'.'); dline;xlabel('FR wait time');ylabel('VR wait time');prettyplot;% mean of the inter-outcome interval for diff action rates. this 1/lambda_o
+%subplot 223; plot(FR.meanNumAct,VR.meanNumAct,'.'); dline;xlabel('FR mean num actions');ylabel('VR mean number actions');prettyplot; % mean number of actions till reward 
+%subplot 224; plot(FR.meanATO,VR.meanATO,'.'); dline;xlabel('FR mean of H_{O|A}');ylabel('VR mean of H_{O|A}');prettyplot; % mean number of actions till reward 
  %mean of the action to outcome distribtion (conditional entropy)
 
  
-%% beta? (use a smaller step size)
-for i = 1:size(VR.I,1)
-VR.dIdA(i,:) = gradient(VR.I(i,:))./gradient(la);
-VR.dAdO(i,:) = gradient(la)./gradient(VR.lambda_o(i,:));
-end
-
-% for i = 1:size(VR.I,1)
-% VR.dIdA(i,:) = diff(VR.I(i,:))./diff(la);
-% VR.dAdO(i,:) = median(diff(la)./diff(VR.lambda_o(i,:)));
-% end
-
-
-VR.beta = VR.dIdA.*VR.dAdO;
-
-figure; plot(la,VR.dIdA'); figure;plot(la,VR.dAdO'); 
-figure; plot(la,VR.beta'); 
- %% analytical
-% figure;hold on;
 % 
 % subplot 222; hold on;
 % HO = 1-log(la./ratio');

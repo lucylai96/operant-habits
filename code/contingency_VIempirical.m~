@@ -257,7 +257,7 @@ ylabel('outcome rate \lambda_o')
 % ylabel('resource constraint \beta')
 axis square
 % axis([0 2 0 100])
-legend('VI2','VI5','VI10','VI20')
+legend('VI1','VI2','VI5','VI10','VI20')
 legend('boxoff')
 prettyplot
 
@@ -267,7 +267,7 @@ plot(la',VI.HO','--','LineWidth', 1.5);
 plot(la',VI.HOA','LineWidth', 1.5)
 xlabel('action rate \lambda_a')
 ylabel('conditional entropy H_{O|A}')
-legend('VI2','VI5','VI10','VI20','Location','southeast')
+legend('VI1','VI2','VI5','VI10','VI20','Location','southeast')
 legend('boxoff')
 axis([0 1 0 5])
 axis square
@@ -320,7 +320,7 @@ plot(la',FI.HO','--','LineWidth', 1.5);
 plot(la',FI.HOA','LineWidth', 1.5)
 xlabel('action rate \lambda_a')
 ylabel('conditional entropy H_{O|A}')
-legend('FI2','FI5','FI10','FI20','Location','southeast')
+legend('FI1','FI2','FI5','FI10','FI20','Location','southeast')
 legend('boxoff')
 axis([0 1 0 5])
 axis square
@@ -377,27 +377,27 @@ legend('boxoff')
 %mean of the action to outcome distribtion (conditional entropy)
 suptitle ('FI')
 
-% figure;
-% subplot 222; plot(FI.waitTimeMean,VI.waitTimeMean,'.'); dline;xlabel('FI wait time');ylabel('VI wait time');prettyplot;% mean of the inter-outcome interval for diff action rates. this 1/lambda_o
-% subplot 223; plot(FI.meanNumAct,VI.meanNumAct,'.'); dline;xlabel('FI mean num actions');ylabel('VI mean number actions');prettyplot; % mean number of actions till reward
-% subplot 224; plot(FI.meanATO,VI.meanATO,'.'); dline;xlabel('FI mean of H_{O|A}');ylabel('VI mean of H_{O|A}');prettyplot; % mean number of actions till reward
+figure;
+subplot 222; plot(FI.waitTimeMean,VI.waitTimeMean,'.'); dline;xlabel('FI wait time');ylabel('VI wait time');prettyplot;% mean of the inter-outcome interval for diff action rates. this 1/lambda_o
+subplot 223; plot(FI.meanNumAct,VI.meanNumAct,'.'); dline;xlabel('FI mean num actions');ylabel('VI mean number actions');prettyplot; % mean number of actions till reward
+subplot 224; plot(FI.meanATO,VI.meanATO,'.'); dline;xlabel('FI mean of H_{O|A}');ylabel('VI mean of H_{O|A}');prettyplot; % mean number of actions till reward
 %mean of the action to outcome distribtion (conditional entropy)
 
-% 
-%  
-% %% beta? (use a smaller step size)
-% for i = 1:size(VI.I,1)
-% VI.dIdA(i,:) = gradient(VI.I(i,:))./gradient(la);
-% VI.dAdO(i,:) = gradient(la)./gradient(VI.lambda_o(i,:));
+
+ 
+%% beta? (use a smaller step size)
+for i = 1:size(VI.I,1)
+VI.dIdA(i,:) = gradient(VI.I(i,:))./gradient(la);
+VI.dAdO(i,:) = gradient(la)./gradient(VI.lambda_o(i,:));
+end
+
+% for i = 1:size(VR.I,1)
+% VR.dIdA(i,:) = diff(VR.I(i,:))./diff(la);
+% VR.dAdO(i,:) = median(diff(la)./diff(VR.lambda_o(i,:)));
 % end
-% 
-% % for i = 1:size(VR.I,1)
-% % VR.dIdA(i,:) = diff(VR.I(i,:))./diff(la);
-% % VR.dAdO(i,:) = median(diff(la)./diff(VR.lambda_o(i,:)));
-% % end
-% 
-% 
-% VI.beta = VI.dIdA.*VI.dAdO;
-% 
-% figure; plot(la,VI.dIdA'); figure;plot(la,VI.dAdO'); 
-% figure; plot(la,VI.beta'); 
+
+
+VI.beta = VI.dIdA.*VI.dAdO;
+
+figure; plot(la,VI.dIdA'); figure;plot(la,VI.dAdO'); 
+figure; plot(la,VI.beta'); 
