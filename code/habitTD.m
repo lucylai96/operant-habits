@@ -44,7 +44,7 @@ a = 2;
 for t = 2:timeSteps 
     
     %% take an action according to policy
-    p_a = exp(0.3*theta'*b);
+    p_a = exp(theta'*b);
     p_a = p_a';
     p_a = p_a./sum(p_a);
     
