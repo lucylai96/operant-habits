@@ -46,14 +46,12 @@ switch sched.type
         p = 1/sched.I; % every second, I have a p probability of observing a reward
         
         % require: intTimes?
-        %         if length(X(find(X(1:t)==2,1,'last'):t)) > intTimes(k) && A(t) == 2
-        %             x = 2; % observe reward
-        %             k = k+1;
-        %         end
-        if A(t) == 2 && binornd(1,p) == 1 % if i lever press AND reward is delivered
-            x = 2; % observe reward or not?
-        else
-            x = 1;
+%         if length(X(find(X(1:t)==2,1,'last'):t)) > intTimes(k) && A(t) == 2
+%             x = 2; % observe reward
+%             k = k+1;
+%         end
+        if A(t) == 2
+          x = binornd(1,p)+1; % observe reward or not?
         end
 end
 end

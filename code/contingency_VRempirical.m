@@ -2,7 +2,7 @@
 % agent samples the
 
 function contingency_VRempirical
-
+addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/');
 % here, we verify that lambda_o is 1/R * lambda_a
 
 
@@ -69,7 +69,7 @@ for r = 1:length(ratio)
         ATO = NaN(1,T); % A->O; conditional dist
         RTO = NaN(1,T); % random points -> O; unconditional/basal dist
         
-        rand_points = sort(datasample([1:T],sum(A),'Replace',false));
+        rand_points = sort(datasample([1:T],sum(A),'Replace',true));
         RT = zeros(1,T);
         RT(rand_points) = 1;
         
@@ -167,7 +167,7 @@ for r = 1:length(ratio)
         ATO = NaN(1,T); % A->O; conditional dist
         RTO = NaN(1,T); % random points -> O; unconditional/basal dist
         
-        rand_points = sort(datasample([1:T],sum(A),'Replace',false));
+        rand_points = sort(datasample([1:T],sum(A),'Replace',true));
         RT = zeros(1,T);
         RT(rand_points) = 1;
         

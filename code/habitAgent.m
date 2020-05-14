@@ -1,5 +1,5 @@
-function results = habitTD(O,T, sched)
-% PURPOSE: Free-operant learning in VR and VI environments 
+function results = habitAgent(O,T,sched,timeSteps)
+% PURPOSE: Free-operant learning 
 % AUTHOR: Lucy Lai
 %
 % USAGE: results = habitTD(x,O,T)
@@ -24,7 +24,7 @@ function results = habitTD(O,T, sched)
 S = size(T,1);      % number of states
 A = size(O,1);      % number of actions
 b = ones(S,1)/S;    % belief state
-timeSteps = 2000; % total number timesteps
+%timeSteps = 2000; % total number timesteps
 
 % weights
 theta  = zeros(S,2);            % policy weights
@@ -70,11 +70,17 @@ for t = 2:timeSteps
     b0 = b;                                             % old posterior, used later
     b = ((T(:,:,a(t))'*b0).*squeeze(O(:,a(t),x(t))));   % b = b'*(T.*squeeze(O(:,:,x(t))));
     %b = b';
+    if sum(b) <0.01
+        keyboard
+    end
+    if t>1500
+        keyboard
+    end
     b = b./sum(b); % normalize
     
     %% TD update
     w0 = w;
-    r = double(x(t)==2)-0.01;            % instant reward
+    r = double(x(t)==2)-0.1;            % instant reward
     rpe = r + w'*(b-b0);            % TD error
     % ** add average reward, add complexity cost **
     w = w + alpha_w*rpe*b0;         % weight update

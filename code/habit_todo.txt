@@ -1,10 +1,11 @@
 habit todo
 
 todo
-- 
+analysis
+- how does action rate change over learning?
+- calculate "beta" 
+- build in policy cost
 
-running
-- 
-
-done
-- 
+notes
+- "learned" O matrix is same for all schedules, only see reward if they have just pressed and end up in state 1 
+- initialize O matrix to 0.5 for all?
