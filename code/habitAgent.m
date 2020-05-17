@@ -35,9 +35,6 @@ alpha_w = 0.2;          % value learning rate
 alpha_t = 0.2;          % policy learning rate
 alpha_b = 0.2;          % beta learning rate
 
-
-lastS = S;
-
 x = 2;
 a = 2;
 
@@ -73,9 +70,7 @@ for t = 2:timeSteps
     if sum(b) <0.01
         keyboard
     end
-    if t>1500
-        keyboard
-    end
+  
     b = b./sum(b); % normalize
     
     %% TD update

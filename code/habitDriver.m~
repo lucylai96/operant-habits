@@ -1,10 +1,9 @@
 function habitDriver
 %% PURPOSE: Main function
-% Written by Lucy Lai (May 2020)
+% AUTHOR:
 % NOTES:
 %   T(i,j,k)  = P(s'=j|s=i,a=k) is the probability of transitioning from sub-state i->j after taking action k
 %   O(i,j,k) = P(x=k|s=i,a=j) is the probability of observing x in state s after taking action a
-%   assumptions: learned reward and transition matrix
 
 close all
 map = brewermap(9,'Reds');
@@ -13,13 +12,14 @@ set(0, 'DefaultAxesColorOrder', map) % first three rows
 
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/');                  % various statistical tools
 
+%% testing a learned reward and transition matrix
 
 timeSteps = 2000;
+
 
 %% FR
 sched.type = 'FR';
 sched.R = 10;      % ratio parameters
-[0,T] =  habitSchedule(sched);
 FR = habitAgent(O,T, sched, timeSteps);
 
 
@@ -37,7 +37,7 @@ VR = habitAgent(O,T, sched, timeSteps);
 %% VI
 sched.type = 'VI';
 sched.I = 5;      % ratio parameters
-sched.times = contingency_generateVI(sched.I); % pre-generated wait times
+sched.times = [waitTimes] = contingency_generateVI(int);
 sched.k = 1;      % ratio parameters
 VI = habitAgent(O,T, sched, timeSteps);
 
