@@ -9,7 +9,7 @@ function [O,T] = habitSchedule(sched)
 % OUTPUT: O - observation matrix
 %         T - transition matrix
 
-fig = 1;
+fig = 0;
 nA = 2;    % number of actions {1: nothing, 2: lever press}
 nO = 2;    % number of observations {1: nothing, 2: reward}
 
@@ -50,7 +50,7 @@ switch sched.type
         for i = 1:nS-1
             T(i,i+1,1) = 1;
         end
-        T(nS,1,1) = 1;
+        T(nS,nS,1) = 1;
         
         % a = tap
         for i = 1:nS-1
@@ -79,9 +79,11 @@ switch sched.type
         
         % a = tap
         for i = 1:nS-1
-            T(i,i+1,2) = 0.7; % bias to think that tapping does something
+            T(i,i+1,2) = 0.5; % tap either moves closer to reward
+            T(i,1,2) = 0.5;   % or gets reward
         end
-        T(:,1,2) = 0.3;
+        T(nS,nS,2) = 0.5;
+        T(nS,1,2) = 0.5;
         
         % observation matrix
         O(:,:,1) = 1; % see nothing
@@ -101,14 +103,15 @@ switch sched.type
         for i = 1:nS-1
             T(i,i+1,1) = 1;
         end
-        T(nS,nS,1) = 0.5;
-        T(nS,1,1) = 0.5;
+        T(nS,nS,1) = 1;
         
-        % a = tap
+         % a = tap
         for i = 1:nS-1
-            T(i,i+1,2) = 1;
+            T(i,i+1,2) = 0.5; % tap either moves closer to reward
+            T(i,1,2) = 0.5;   % or gets reward
         end
-        T(nS,1,2) = 1;
+        T(nS,nS,2) = 0.5;
+        T(nS,1,2) = 0.5;
         
         % observation matrix
         O(:,:,1) = 1; % see nothing
@@ -117,35 +120,36 @@ switch sched.type
         
 end
 
-colormap(winter)
+
 if fig
     figure; hold on;
-    subplot 121
+    subplot 221
     imagesc(T(:,:,1)); % for "null"
     title('a = null')
     axis square; prettyplot
+    ylabel('transition matrix')
     set(gca,'YDir','normal')
-    subplot 122
+    subplot 222
     imagesc(T(:,:,2)); % for "reward"
     axis square; prettyplot
     set(gca,'YDir','normal')
     title('a = tap')
-    suptitle('transition matrix')
     
-    figure; hold on;
-    subplot 121
+    
+    subplot 223
     imagesc(O(:,:,1)); % for "null"
     title('x = null')
     set(gca,'YDir','normal')
     axis square
+    ylabel('observation matrix')
     prettyplot
-    subplot 122
+    subplot 224
     imagesc(O(:,:,2)); % for "reward"
     set(gca,'YDir','normal')
     title('x = reward')
     axis square
     prettyplot
-    suptitle('observation matrix')
+   
     
 end
 end

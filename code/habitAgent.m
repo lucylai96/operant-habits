@@ -24,7 +24,9 @@ function results = habitAgent(O,T,sched,timeSteps)
 S = size(T,1);      % number of states
 A = size(O,1);      % number of actions
 b = ones(S,1)/S;    % belief state
-%timeSteps = 2000; % total number timesteps
+beta = sched.beta;  
+deval = zeros(1,timeSteps); % a vector of when devaluation turns on
+deval(:,sched.devalTime:end) = 1; % a vector of when devaluation turns on
 
 % weights
 theta  = zeros(S,2);            % policy weights
@@ -58,14 +60,14 @@ for t = 2:timeSteps
     end
     
     %% observe reward and new state
-    [x(t)] = habitWorld(t, a, x, sched);
+    [x(t), sched] = habitWorld(t, a, x, sched);
     
     
     %% belief state calculation
     % b = b+G_blur(idx,:)'; % currently blurring belief by absolute time, may not be super plausible, maybe the reset happens when they tap
     
     b0 = b;                                             % old posterior, used later
-    b = ((T(:,:,a(t))'*b0).*squeeze(O(:,a(t),x(t))));   % b = b'*(T.*squeeze(O(:,:,x(t))));
+    b = ((T(:,:,a(t))'*b0).*O(:,a(t),x(t)));   % b = b'*(T.*squeeze(O(:,:,x(t))));
     %b = b';
     if sum(b) <0.01
         keyboard
@@ -73,10 +75,29 @@ for t = 2:timeSteps
   
     b = b./sum(b); % normalize
     
+    %% complexity
+    Pa(1) = sum(a(1:t)==1)/t; % marginal action dist
+    Pa(2) = sum(a(1:t)==2)/t; % marginal action dist
+    cost = log(p_a./Pa);   % cost of that action in this state
+    beta = beta + alpha_b*(cost-sched.cmax); % adaptive beta
+    
     %% TD update
     w0 = w;
-    r = double(x(t)==2)-0.1;            % instant reward
-    rpe = r + w'*(b-b0);            % TD error
+    switch sched.model % different models with different costs
+        case 1 % no action cost, no complexity cost
+        r = deval(t)*double(x(t)==2);      % reward (deval is a flag for whether we are in deval mode) 
+        rpe = r + w'*(b-b0);            % TD error
+        case 2 % yes action cost, no complexity cost
+        r = deval(t)*double(x(t)==2); % yes action cost, no complexity cost       
+        rpe = r + w'*(b-b0)-sched.acost;           
+        case 3 % yes action cost, no complexity cost
+        r = deval(t)*double(x(t)==2);         
+        rpe = r + w'*(b-b0)-sched.acost-(1/beta(a(t)).*cost(a(t)));        
+        case 4
+        r = deval(t)*double(x(t)==2);        
+        rpe = r + w'*(b-b0)-sched.acost-(1/beta(a(t)).*cost(a(t)));  
+    end
+    
     % ** add average reward, add complexity cost **
     w = w + alpha_w*rpe*b0;         % weight update
     
@@ -91,6 +112,7 @@ for t = 2:timeSteps
     results.theta(:,:,t) = theta0;
     results.rpe(t,:) = rpe; % average reward RPE
     results.v(t) = w'*b0; % estimated value
+    results.cost(t,:) = cost;
     
     results.a(t) = a(t);
     results.x(t) = x(t);

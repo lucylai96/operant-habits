@@ -1,4 +1,4 @@
-function [x] = habitWorld(t, A, X, sched)
+function [x,sched] = habitWorld(t, A, X, sched)
 % takes in state and action, outputs observation x
 % for 4 different schedules: FI, FR, VI, VR
 
@@ -46,9 +46,11 @@ switch sched.type
         intTimes = sched.times;
         k = sched.k;
         
-        if length(X(find(X(1:t)==2,1,'last'):t)) > intTimes(k) && A(t) == 2
+        if length(X(find(X(1:t-1)==2,1,'last'):t-1)) >= intTimes(k) && A(t) == 2
             x = 2; % observe reward
             sched.k = sched.k+1;
+        else
+            x = 1;
         end
         
 end

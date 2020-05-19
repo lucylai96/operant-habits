@@ -7,78 +7,98 @@ function habitDriver
 %   assumptions: learned reward and transition matrix
 
 close all
+clear all
 map = brewermap(9,'Reds');
-colormap(map)
 set(0, 'DefaultAxesColorOrder', map) % first three rows
 
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/');                  % various statistical tools
 
 
-timeSteps = 2000;
-
-%% FR
-sched.type = 'FR';
-sched.R = 10;      % ratio parameters
-[0,T] =  habitSchedule(sched);
-FR = habitAgent(O,T, sched, timeSteps);
-
-
-%% FI
-sched.type = 'FI';
-sched.I = 10;      % ratio parameters
-FI = habitAgent(O,T, sched, timeSteps);
-
-
-%% VR
-sched.type = 'VR';
-sched.R = 5;      % ratio parameters
-VR = habitAgent(O,T, sched, timeSteps);
-
-%% VI
-sched.type = 'VI';
-sched.I = 5;      % ratio parameters
+timeSteps = 3000;
+type = {'FR', 'VR', 'FI', 'VI'};
+sched.R = 10; 
+sched.I = 10; 
+sched.acost = 0.1;   % action cost
+sched.cmax = 10;     % max complexity cost
+sched.beta = 100;    % starting beta
+sched.model = 3;     % which lesioned model to run
+sched.devalTime = 1500;
+% for VI only
 sched.times = contingency_generateVI(sched.I); % pre-generated wait times
-sched.k = 1;      % ratio parameters
-VI = habitAgent(O,T, sched, timeSteps);
+sched.k = 1;   
 
+for i = 1:length(type)
+    sched.type = type{i};
+    [O,T] =  habitSchedule(sched);
+    results(i) = habitAgent(O,T, sched, timeSteps);
+end 
 
-%% figures
+%% cumulative sum plots 
 num = 100; % last how many # trials to look at
-figure;hold on;
-FRcs = cumsum(FR.a(end-num:end)-1);
-plot(FRcs,'b','LineWidth',2);
-xplot = find(FR.x(end-num:end)==2);
-line([xplot' xplot'+10]',[FRcs(xplot)' FRcs(xplot)']','LineWidth',2,'Color','k')
+figure; hold on;
+map = brewermap(4,'*RdBu');
+colormap(map)
+%set(0, 'DefaultAxesColorOrder', map) % first three rows
 
-FIcs = cumsum(FI.a(end-num:end)-1);
-plot(FIcs,'r','LineWidth' ,2);
-xplot = find(FI.x(end-num:end)==2);
-line([xplot' xplot'+10]',[FIcs(xplot)' FIcs(xplot)']','LineWidth',2,'Color','k')
+for i = 1:length(type)
+    results(i).cs = cumsum(results(i).a(end-num:end)-1);
+    h(i,:) = plot(results(i).cs,'Color',map(i,:),'LineWidth',2);
+    xplot = find(results(i).x(end-num:end)==2);
+    line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']','LineWidth',2,'Color','k');
+end 
 
-VRcs = cumsum(VR.a(end-num:end)-1);
-plot(VRcs,'g','LineWidth',2);
-xplot = find(VR.x(end-num:end)==2);
-line([xplot' xplot'+10]',[VRcs(xplot)' VRcs(xplot)']','LineWidth',2,'Color','k')
-
-VIcs = cumsum(VI.a(end-num:end)-1);
-plot(VIcs,'m','LineWidth',2);
-xplot = find(VI.x(end-num:end)==2);
-line([xplot' xplot'+10]',[VIcs(xplot)' VIcs(xplot)']','LineWidth',2,'Color','k')
-
+legend(h,type);
+legend('boxoff')
 xlabel('time')
 ylabel('cumulative # actions')
-prettyplot
+prettyplot(20)
 
-FR_pa = exp(FR.theta(:,:,end));
-FR_pa = FR_pa./sum(FR_pa,2);
-FI_pa = exp(FI.theta(:,:,end));
-FI_pa = FI_pa./sum(FI_pa,2);
-VR_pa = exp(VR.theta(:,:,end));
-VR_pa = VR_pa./sum(VR_pa,2);
-VI_pa = exp(VI.theta(:,:,end));
-VI_pa = VI_pa./sum(VI_pa,2);
-figure;hold on;
-imagesc([FR_pa(:,2) FI_pa(:,2) VR_pa(:,2) VI_pa(:,2)])
+%% analysis 
+
+% probability of action (learned policy weights)
+for i = 1:length(type)
+    results(i).Pa = exp(results(i).theta(:,:,end));
+    results(i).Pa = results(i).Pa./sum(results(i).Pa,2);
+end 
+
+figure;
+colormap(flipud(gray))
+imagesc([results(1).Pa(:,2) results(2).Pa(:,2) results(3).Pa(:,2) results(4).Pa(:,2)])
+set(gca,'xtick',[1:length(type)],'xticklabel',type)
+ylabel('state')
+prettyplot(20)
+
+% outcome and action rates
+for i = 1:length(type)
+    results(i).outRate = sum(results(i).x==2)/timeSteps;
+    results(i).actRate = sum(results(i).a==2)/timeSteps;
+    
+    % moving average
+    win = 100; % # seconds moving window
+    results(i).movOutRate = movsum(results(i).x-1, win)/win;
+    results(i).movActRate = movsum(results(i).a-1, win)/win;
+   
+end 
+
+figure; hold on; 
+plot(results(1).movOutRate,'k')
+figure; hold on; 
+plot(results(1).movActRate,'k')
+
+figure; hold on;
+map = brewermap(4,'*RdBu');
+colormap(map)
+for i = 1:length(type)
+    bar(i,results(i).outRate);
+    bar(i+4,results(i).actRate)
+end 
+
+
+%% findings to replication
+% In Experiment 1, the time between outcomes obtained on a variable ratio (VR) schedule became the intervals for a yoked variable interval (VI) schedule. Response rates were higher on the VR than on the VI schedule. In Experiment 2, the number of responses required per outcome on a VR schedule were matched to that on a master VI 20-s schedule. Both ratings of causal effectiveness and response rates were higher in the VR schedule. 
+% store action rates 
+
+figure; hold on;
 
 
 
