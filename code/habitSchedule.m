@@ -1,5 +1,5 @@
 function [O,T] = habitSchedule(sched)
-% takes in state and action, outputs observation x
+% initialize observation and transition matrices for four schedules
 % for 4 different schedules: FI, FR, VI, VR
 
 % INPUT:  sched.type -  FR, FI, VR, VI

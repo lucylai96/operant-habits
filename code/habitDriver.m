@@ -20,7 +20,7 @@ sched.R = 10;
 sched.I = 10; 
 sched.acost = 0.1;   % action cost
 sched.cmax = 10;     % max complexity cost
-sched.beta = 100;    % starting beta
+sched.beta = 50;    % starting beta; high beta = low cost. beta should increase for high contingency
 sched.model = 3;     % which lesioned model to run
 sched.devalTime = 1500;
 % for VI only
@@ -55,9 +55,9 @@ prettyplot(20)
 
 %% analysis 
 
-% probability of action (learned policy weights)
+% probability of action (learned policy weights) over time
 for i = 1:length(type)
-    results(i).Pa = exp(results(i).theta(:,:,end));
+    results(i).Pa = exp(results(i).theta);
     results(i).Pa = results(i).Pa./sum(results(i).Pa,2);
 end 
 

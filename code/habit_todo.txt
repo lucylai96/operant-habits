@@ -4,8 +4,11 @@ todo
 analysis
 - how does action rate change over learning?
 - calculate "beta" 
-- build in policy cost
+- show that beta should increase for high contingency 
+    - start large: low cost, if gets smaller, it means that cost to pay is getting larger
 
 notes
 - "learned" O matrix is same for all schedules, only see reward if they have just pressed and end up in state 1 
 - initialize O matrix to 0.5 for all?
+
+- question: if cost is always bounded by 0, but my policy pi(a|s) = [0.5 0.5] and pa = [0 1]
