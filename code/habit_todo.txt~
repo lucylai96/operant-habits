@@ -1,0 +1,31 @@
+habit todo
+
+todo
+model (priority)
+- can make blahut arimoto reward complexity curves by counting state visitations and actions in those state (but this might be the opposite of what we want bc for ratio schedules, we basically do same action regardless of state and for interval schedules we do) 
+- does beta match with d(complex)/dV?
+- write a loop to go through all 4 models 
+- show sensitivity to outcome devaluation for less vs more training 
+- show less responding for yolked
+
+(1) we can explain all these traditional findings (which require the policy search, which don't?)
+(2) 
+
+analysis
+- show that beta should increase for high contingency 
+    - beta large: low cost, beta small: high cost
+    - if beta gets smaller, it means that cost to pay is getting larger (VI/FI)
+    - if beta gets larger, it means that cost to pay is getting smaller (VR/FR)
+- if cost is less than cmax, you're allowed to increase cost a bit, so beta should decrease!
+- if cost less than cmax, beta should decrease
+- empirical question: if beta keeps decreasing, does the cost increase?
+
+notes
+- "learned" O matrix is same for all schedules, only see reward if they have just pressed and end up in state 1 
+- initialize O matrix to 0.5 for all?
+
+- question: if cost is always bounded by 0, but my policy pi(a|s) = [0.5 0.5] and pa = [0 1]
+
+questions for Eric Garr:
+- devaluation  error bars are from pooling over animals? 
+- how long is devaluation usually carried out before quantifying the press rate?

@@ -25,8 +25,8 @@ S = size(T,1);        % number of states
 b = ones(S,1)/S;      % belief state
 beta = sched.beta;    % beta
 acost = sched.acost;  % action cost
-deval = zeros(1,timeSteps);       % a vector of when devaluation turns on
-deval(:,sched.devalTime:end) = 1; % a vector of when devaluation turns on
+deval = ones(1,timeSteps);        % a vector of when devaluation turns on
+deval(:,sched.devalTime:end) = 0; % 0 means devaluation model
 
 % weights
 theta  = zeros(S,2);            % policy weights
@@ -35,7 +35,7 @@ w = zeros(S,1);                 % value weights
 % learning rates
 alpha_w = 0.2;          % value learning rate
 alpha_t = 0.2;          % policy learning rate
-alpha_b = 0.2;          % beta learning rate
+alpha_b = 5;            % beta learning rate
 
 x = 2;
 a = 2;
@@ -75,25 +75,27 @@ for t = 2:timeSteps
     b = b./sum(b); % normalize
     
     %% policy complexity
-    pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;   % marginal action distribution
-    pcost = log(pi_as./pa);                               % cost of that action in this state
+    pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;             % marginal action distribution
+    cost = log(pi_as./pa);                               % cost of that action in this state
     % should be lower bounded by 0
+    
+    MI = pi_as.*cost;                                    % calculate mutual information 
     
     %% TD update
     switch sched.model % different models with different costs
-        case 1 % no action cost, no complexity cost
-        r = deval(t)*double(x(t)==2);      % reward (deval is a flag for whether we are in deval mode) 
-        rpe = r + w'*(b-b0);            % TD error
-        case 2 % yes action cost, no complexity cost
-        r = deval(t)*double(x(t)==2)-acost; % yes action cost, no complexity cost       
+        case 1                                % no action cost, no complexity cost
+        r = deval(t)*double(x(t)==2);         % reward (deval is a flag for whether we are in deval mode) 
+        rpe = r + w'*(b-b0);                  % TD error
+        case 2                                % yes action cost, no complexity cost
+        r = deval(t)*double(x(t)==2)-acost;   % yes action cost, no complexity cost       
         rpe = r + w'*(b-b0);           
-        case 3 % yes action cost, yes complexity cost (fixed)
+        case 3                                % yes action cost, yes complexity cost (fixed)
         r = deval(t)*double(x(t)==2)-acost;         
-        rpe = r + w'*(b-b0)-(1/beta).*pcost(a(t));        
-        case 4 % yes action cost, yes complexity cost (adaptive)
+        rpe = r + w'*(b-b0)-(1/beta).*cost(a(t));        
+        case 4                                % yes action cost, yes complexity cost (adaptive)
         r = deval(t)*double(x(t)==2)-acost;        
-        rpe = r + w'*(b-b0)-(1/beta).*pcost(a(t));  
-        beta = beta + alpha_b*r*(pcost(a(t))-sched.cmax); % adaptive beta
+        rpe = r + w'*(b-b0)-(1/beta).*cost(a(t));  
+        beta = beta + alpha_b*r*(sched.cmax-cost(a(t))); % adaptive beta, beta high = low cost to pay, beta low = high cost to pay
     end
     
     %% value update
@@ -110,14 +112,15 @@ for t = 2:timeSteps
     results.theta(:,:,t) = theta0;
     results.rpe(t,:) = rpe; % average reward RPE
     results.v(t) = w'*b0; % estimated value
-    results.cost(t,:) = pcost;
+    results.cost(t,:) = cost;
+    results.beta(t) = beta;
     
     results.a(t) = a(t);
     results.x(t) = x(t);
     %results.state(t) = lastS; % state you came from
     
 end
-why
+
 %% plots
 % if plt == 1
 %     figure; hold on;

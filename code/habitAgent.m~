@@ -25,8 +25,8 @@ S = size(T,1);        % number of states
 b = ones(S,1)/S;      % belief state
 beta = sched.beta;    % beta
 acost = sched.acost;  % action cost
-deval = zeros(1,timeSteps);       % a vector of when devaluation turns on
-deval(:,sched.devalTime:end) = 1; % a vector of when devaluation turns on
+deval = ones(1,timeSteps);        % a vector of when devaluation turns on
+deval(:,sched.devalTime:end) = 0; % 0 means devaluation model
 
 % weights
 theta  = zeros(S,2);            % policy weights
@@ -79,6 +79,8 @@ for t = 2:timeSteps
     pcost = log(pi_as./pa);                               % cost of that action in this state
     % should be lower bounded by 0
     
+    MI = pi_as.*pcostresults(i);  % calculate mutual information 
+    
     %% TD update
     switch sched.model % different models with different costs
         case 1 % no action cost, no complexity cost
@@ -111,13 +113,14 @@ for t = 2:timeSteps
     results.rpe(t,:) = rpe; % average reward RPE
     results.v(t) = w'*b0; % estimated value
     results.cost(t,:) = pcost;
+    results.beta(t) = beta;
     
     results.a(t) = a(t);
     results.x(t) = x(t);
     %results.state(t) = lastS; % state you came from
     
 end
-why
+
 %% plots
 % if plt == 1
 %     figure; hold on;
