@@ -35,7 +35,7 @@ w = zeros(S,1);                 % value weights
 % learning rates
 alpha_w = 0.2;          % value learning rate
 alpha_t = 0.2;          % policy learning rate
-alpha_b = 5;            % beta learning rate
+alpha_b = 0.2;            % beta learning rate
 
 x = 2;
 a = 2;
@@ -75,11 +75,21 @@ for t = 2:timeSteps
     b = b./sum(b); % normalize
     
     %% policy complexity
-    pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;             % marginal action distribution
-    cost = log(pi_as./pa);                               % cost of that action in this state
-    % should be lower bounded by 0
+    % should encompass all states and actions (entire policy)
+    pii = exp(theta.*b); % entire state dep policy
+    pii = pii./sum(pii,2);
     
-    MI = pi_as.*cost;                                    % calculate mutual information 
+    pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;             % marginal action distribution
+    pa = pa+0.01; pa = pa./sum(pa);
+    mi = sum(sum(pii.*log(pii./pa),2));                   % expected cost
+    if isnan(mi)
+        keyboard
+    end
+    %cost = mi;
+    cost = log(pi_as./pa);
+    cost = cost(a(t));                               % policy cost for that state-action pair
+    
+    %MI = sum(pi_as.*cost);                                    % calculate mutual information 
     
     %% TD update
     switch sched.model % different models with different costs
@@ -91,11 +101,12 @@ for t = 2:timeSteps
         rpe = r + w'*(b-b0);           
         case 3                                % yes action cost, yes complexity cost (fixed)
         r = deval(t)*double(x(t)==2)-acost;         
-        rpe = r + w'*(b-b0)-(1/beta).*cost(a(t));        
+        rpe = r + w'*(b-b0)-(1/beta).*cost;        
         case 4                                % yes action cost, yes complexity cost (adaptive)
         r = deval(t)*double(x(t)==2)-acost;        
-        rpe = r + w'*(b-b0)-(1/beta).*cost(a(t));  
-        beta = beta + alpha_b*r*(sched.cmax-cost(a(t))); % adaptive beta, beta high = low cost to pay, beta low = high cost to pay
+        rpe = r + w'*(b-b0)-(1/beta).*cost;  
+        %rv = results.r(t-100:end)/100;
+        beta = beta + alpha_b*r*(sched.cmax-mi); % adaptive beta, beta high = low cost to pay, beta low = high cost to pay
     end
     
     %% value update
@@ -110,10 +121,11 @@ for t = 2:timeSteps
     results.b(t,:) = b0;
     results.w(t,:) = w0;
     results.theta(:,:,t) = theta0;
-    results.rpe(t,:) = rpe; % average reward RPE
+    results.rpe(t,:) = rpe; % RPE
     results.v(t) = w'*b0; % estimated value
     results.cost(t,:) = cost;
     results.beta(t) = beta;
+    results.mi(t) = mi;
     
     results.a(t) = a(t);
     results.x(t) = x(t);

@@ -6,12 +6,20 @@ function habitDriver
 %   O(i,j,k) = P(x=k|s=i,a=j) is the probability of observing x in state s after taking action a
 %   assumptions: learned reward and transition matrix
 
-close all
+%close all
 clear all
+
+addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                  % various statistical tools
 map = brewermap(9,'Reds');
+%% conditions
+%arm param: [2 5 10 20]
+%a cost: 0 or 0.1
+% cmax always the same % only model 4
+%beta = [10 20 30 40 50] % only for model 3 
+%deval = [0 1](do some with and without deval
+% model
 
-addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/');                  % various statistical tools
-
+%%
 
 timeSteps = 5000;
 type = {'FR', 'VR', 'FI', 'VI'};
@@ -20,9 +28,9 @@ sched.I = 10;
 sched.acost = 0.1;   % action cost
 sched.cmax = 10;     % max complexity cost
 sched.beta = 50;    % starting beta; high beta = low cost. beta should increase for high contingency
-sched.model = 4;     % which lesioned model to run {1:}
+sched.model = 3;     % which lesioned model to run {1:}
 sched.devalTime = timeSteps/2;   % timestep where outcome gets devalued
-sched.devalTime = timeSteps;     % timestep where outcome gets devalued
+%sched.devalTime = timeSteps;     % timestep where outcome gets devalued
 % for VI only
 sched.times = contingency_generateVI(sched.I); % pre-generated wait times
 sched.k = 1;
@@ -115,28 +123,33 @@ prettyplot
 %% beta 
 
 figure; hold on;
-subplot 311; hold on;
+subplot 411; hold on;
 for i = 1:length(type)
     plot(results(i).beta,'LineWidth',1.5)
 end
 plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-prettyplot
 ylabel(' \beta')
 legend([type 'devaluation'],'FontSize',15); legend('boxoff')
 
-subplot 312; hold on;
+subplot 412; hold on;
 for i = 1:length(type)
-    plot(sum(results(i).cost(isfinite(results(i).cost)),2),'LineWidth',1.5)
+    plot(sum(results(i).cost,2),'LineWidth',1.5)
 end
 
 ylabel('cost')
 
-subplot 313; hold on;
+subplot 413; hold on;
 for i = 1:length(type)
-    plot((1./results(i).beta).* sum(results(i).cost(isfinite(results(i).cost)),2),'LineWidth',1.5)
+    plot((1./results(i).beta).* results(i).cost','LineWidth',1.5)
 end
 ylabel('1/ \beta * cost')
 
+subplot 414; hold on;
+for i = 1:length(type)
+    plot(results(i).mi,'LineWidth',1.5)
+end
+ylabel('mutual information')
+subprettyplot(4,1)
 
 %% action rate before and after devaluation
 

@@ -20,7 +20,8 @@ model (priority)
 ** analysis **
 
 
-
+questions for sam:
+- is trial by trial cost calculated on the current state and action only?
 
 ** notes **
 - "learned" O matrix is same for all schedules, only see reward if they have just pressed and end up in state 1 
@@ -30,6 +31,8 @@ beta
     - beta large: low cost, beta small: high cost
     - if beta gets smaller, it means that cost to pay is getting larger (VI/FI)
     - if beta gets larger, it means that cost to pay is getting smaller (VR/FR)
+
+- we want beta to increase when mi<sched.cmax OR 0 <sched.cmax-mi
 - if cost is less than cmax, you're allowed to increase policy cost a bit, so beta should increase!
 - if cost less than cmax, beta should increase!
 - if reward is negative, AND cost is not at max, beta decreases
