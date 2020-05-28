@@ -19,10 +19,6 @@ model (priority)
 
 ** analysis **
 
-
-questions for sam:
-- is trial by trial cost calculated on the current state and action only?
-
 ** notes **
 - "learned" O matrix is same for all schedules, only see reward if they have just pressed and end up in state 1 
 - initialize O matrix to 0.5 for all?
@@ -38,6 +34,6 @@ beta
 - if reward is negative, AND cost is not at max, beta decreases
 - if reward positive and cost is not at max, beta increases
 
+** questions for Sam **
 ** questions for Eric Garr **
-- devaluation  error bars are from pooling over animals? 
 - how long is devaluation usually carried out before quantifying the press rate?

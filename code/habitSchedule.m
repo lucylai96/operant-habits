@@ -105,7 +105,7 @@ switch sched.type
         end
         T(nS,nS,1) = 1;
         
-         % a = tap
+        % a = tap
         for i = 1:nS-1
             T(i,i+1,2) = 0.5; % tap either moves closer to reward
             T(i,1,2) = 0.5;   % or gets reward
@@ -149,7 +149,7 @@ if fig
     title('x = reward')
     axis square
     prettyplot
-   
+    
     
 end
 end

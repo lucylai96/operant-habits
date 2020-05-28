@@ -34,19 +34,27 @@ switch sched.type
         %% VR
         
     case 'VR'
+        k = sched.k;
         
-        p = 1/sched.R; % if I just took an action, I have a p probability of observing a reward
-        if A(t) == 2
-            x = binornd(1,p)+1; % observe reward or not?
+        if sum(A(find(X(1:t-1)==2,1,'last'):t)-1) > sched.actions(k)
+            x = 2; % observe reward
+            sched.k = sched.k+1;
         else
             x = 1;
         end
+        
+        %p = 1/sched.R; % if I just took an action, I have a p probability of observing a reward
+        
+        %if A(t) == 2
+        %    x = binornd(1,p)+1; % observe reward or not?
+        %else
+        %    x = 1;
+        %end
         %% VI
     case 'VI'
-        intTimes = sched.times;
         k = sched.k;
         
-        if length(X(find(X(1:t-1)==2,1,'last'):t-1)) >= intTimes(k) && A(t) == 2
+        if length(X(find(X(1:t-1)==2,1,'last'):t-1)) >= sched.times(k) && A(t) == 2
             x = 2; % observe reward
             sched.k = sched.k+1;
         else
