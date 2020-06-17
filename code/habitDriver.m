@@ -16,8 +16,9 @@ function [results]=habitDriver(params,type)
 % Written by Lucy Lai (May 2020)
 
 % close all
+% params: [arm model timeSteps acost beta cmax deval]
 if nargin <1
-    params = [12 4 5000 0.05 25 0.2 0];
+    params = [20 2 8000 0.05 100 0.2 0];
     type = {'FR','VR','FI','VI'};
 end
 
@@ -42,15 +43,14 @@ sched.times = contingency_generateVI(sched.I); % pre-generated wait times before
 % for VR only
 sched.actions = contingency_generateVR(sched.R); % pre-generated number of actions before reward
 sched.k = 1;
+sched.timeSteps = timeSteps;
 
 if deval == 1
     sched.devalTime = timeSteps;                % timestep where outcome gets devalued
-    timeSteps = timeSteps+round(timeSteps/2);   % devaluation test period
+    sched.timeSteps = timeSteps+round(timeSteps/2);   % devaluation test period
 else
     sched.devalTime = timeSteps;                % timestep where outcome gets devalued
 end
-
-sched.timeSteps = timeSteps;
 
 for i = 1:length(type)
     sched.type = type{i};
@@ -288,6 +288,16 @@ xlabel('C(\pi_\theta)')
 ylabel('reward')
 prettyplot
 set(gcf, 'Position',  [300, 300, 1000, 300])
+
+%% MI (action = press)
+
+figure; hold on;
+for i = 1:length(type)
+    bar(i,mean(results(i).mi(end-num:end)),'FaceColor',map(i,:));
+end
+set(gca,'xtick',[1:4],'xticklabel',type)
+ylabel('mutual information I(S;A)')
+prettyplot
 
 %% rho and rpe
 % figure; hold on; subplot 121; hold on;

@@ -1,5 +1,5 @@
-function results = habitAgent(O,T,sched,timeSteps)
-% PURPOSE: Free-operant learning 
+function results = habitAgent(O,T,sched, agent)
+% PURPOSE: Free-operant learning
 % AUTHOR: Lucy Lai
 %
 % USAGE: results = habitTD(x,O,T)
@@ -25,7 +25,7 @@ S = size(T,1);        % number of states
 b = ones(S,1)/S;      % belief state
 beta = sched.beta;    % beta
 acost = sched.acost;  % action cost
-deval = ones(1,timeSteps);        % a vector of when devaluation turns on
+deval = ones(1,sched.timeSteps);        % a vector of when devaluation turns on
 deval(:,sched.devalTime:end) = 0; % 0 means devaluation model
 
 % weights
@@ -33,16 +33,23 @@ theta  = zeros(S,2);            % policy weights
 w = zeros(S,1);                 % value weights
 
 % learning rates
-alpha_w = 0.1;          % value learning rate
-alpha_t = 0.1;          % policy learning rate
-alpha_b = 0.1;          % beta learning rate
+if nargin <4
+    alpha_w = 0.1;          % value learning rate
+    alpha_t = 0.1;          % policy learning rate
+    alpha_b = 1;            % beta learning rate
+else
+    alpha_w = agent.alpha_w;          % value learning rate
+    alpha_t = agent.alpha_t;          % policy learning rate
+    alpha_b = agent.alpha_b;          % beta learning rate
+    
+end
 alpha_r = 0;          % rho learning rate
 
 x = 2;
 a = 2;
 rho = 0;
 
-for t = 2:timeSteps 
+for t = 2:sched.timeSteps
     
     %% take an action according to policy
     pi_as = exp(theta'*b);
@@ -53,7 +60,7 @@ for t = 2:timeSteps
     if rand<pi_as(1)
         a(t) = 1;
     else
-       a(t) = 2;
+        a(t) = 2;
     end
     
     %% observe reward and new state
@@ -67,7 +74,7 @@ for t = 2:timeSteps
     if sum(b) <0.01
         keyboard
     end
-  
+    
     b = b./sum(b); % normalize
     
     %% policy complexity
@@ -77,37 +84,37 @@ for t = 2:timeSteps
     
     pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;             % marginal action distribution
     pa = pa+0.01; pa = pa./sum(pa);
-    mi = sum(b.*sum(pii.*log(pii./pa),2));                   % expected cost
+    mi0 = sum(b.*sum(pii.*log(pii./pa),2));                   % expected cost
+    mi = sum(b.*pii(:,2).*log(pii(:,2)./pa(2)));              % MI actions and outcomes
     %if mi>0
     %    keyboard
     %end
     %cost = mi;
     cost = log(pi_as./pa);
     cost = cost(a(t));                               % policy cost for that state-action pair
-  
-    %MI = sum(pi_as.*cost);                                    % calculate mutual information 
+    
+    %MI = sum(pi_as.*cost);                                    % calculate mutual information
     
     %% TD update
     switch sched.model % different models with different costs
         case 1                                % no action cost, no complexity cost
-        r = deval(t)*double(x(t)==2);         % reward (deval is a flag for whether we are in deval mode) 
-        rpe = r + w'*(b-b0);                  % TD error
+            r = deval(t)*double(x(t)==2);         % reward (deval is a flag for whether we are in deval mode)
+            rpe = r + w'*(b-b0);                  % TD error
         case 2                                % yes action cost, no complexity cost
-        r = deval(t)*double(x(t)==2)-acost*(a(t)==2);   % yes action cost, no complexity cost       
-        rpe = r + w'*(b-b0);           
+            r = deval(t)*double(x(t)==2)-acost*(a(t)==2);   % yes action cost, no complexity cost
+            rpe = r + w'*(b-b0);
         case 3                                % yes action cost, yes complexity cost (fixed)
-        r = deval(t)*double(x(t)==2)-acost*(a(t)==2);         
-        rpe = r + w'*(b-b0)-(1/beta).*cost;        
+            r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
+            rpe = r + w'*(b-b0)-(1/beta).*cost;
         case 4                                % yes action cost, yes complexity cost (adaptive)
-        r = deval(t)*double(x(t)==2)-acost*(a(t)==2);        
-        rpe = r - rho + w'*(b-b0)-(1/beta).*cost;  
-        rho =  rho + alpha_r *(r - rho);             % average reward update
-        if
-        end
-        %rv = results.r(t-100:end)/100;
-        %beta = beta + /rv
-        beta = beta + alpha_b*r*(sched.cmax-cost); % adaptive beta, beta high = low cost to pay, beta low = high cost to pay
-        
+            r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
+            rpe = r - rho + w'*(b-b0)-(1/beta).*cost;
+            rho =  rho + alpha_r *(r - rho);             % average reward update
+            if beta>0
+                beta = beta + alpha_b*r*(sched.cmax-cost); % adaptive beta, beta high = low cost to pay, beta low = high cost to pay
+            else
+                beta = 0;       % specify a floor
+            end
     end
     
     %% value update
@@ -117,7 +124,7 @@ for t = 2:timeSteps
     %% policy update
     theta0 = theta;                         % reward
     theta(:,a(t)) = theta(:,a(t)) + alpha_t*rpe*b0;         % weight update (check policy gradient..)
-     
+    
     %% store results
     results.b(t,:) = b0;
     results.w(t,:) = w0;
@@ -130,6 +137,7 @@ for t = 2:timeSteps
     results.beta(t) = beta;
     results.mi(t) = mi;
     
+    results.pa(t) = pi_as(2);
     results.a(t) = a(t);
     results.x(t) = x(t);
     %results.state(t) = lastS; % state you came from

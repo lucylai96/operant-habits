@@ -16,11 +16,10 @@ set(0, 'DefaultAxesColorOrder', map([3,5,7,9],:)) % first three rows
 
 
 %% new agent
-T = 7200; % timesteps
-%ratio = [10]; % rewarded every R actions
+T = 2000; % timesteps
 ratio = [2 5 10 20]; % rewarded every R actions
 
-la = linspace(0.01,1,20); % action rate (presses per second)
+la = linspace(0.1,1,20); % action rate (presses per second)
 plt = 0;
 for r = 1:length(ratio)
     R = ratio(r);
@@ -118,14 +117,19 @@ for r = 1:length(ratio)
         FR.meanNumAct(r,a) = mean(numAct);
         FR.meanATO(r,a) = nanmean(ATO);
         
-        FR.HOA(r,a) = calc_entropy(ATO);
+        %FR.HOA(r,a) = calc_entropy(ATO);
+        FR.HOA(r,a) = log(ratio(r)/lambda_a);
+        %if a < 5
+        %figure(6); hold on; histogram(ATO,20)
+        %pause(1)
+        %end
         
         % unconditional: the entropy of the observed outcome times distribution = FR.waitTimes
         % this is parameterized by lambda_o
        % FR.HO(r,a) = 1-log(FR.lambda_o(r,a)); %1-log(lambda_o) = 1-log(lambda_a/R)
         
-        FR.HO(r,a) = calc_entropy(RTO);
-        
+        %FR.HO(r,a) = calc_entropy(RTO);
+        FR.HO(r,a) = 1-log(lambda_a/R);
         %% VR world | variable ratio
         % verify that lambda_o is 1/R * lambda_a
         %R = 10; %
@@ -221,19 +225,28 @@ for r = 1:length(ratio)
         % histogram(WT,50); title(strcat('Wait times')); prettyplot;
         % histogram(A,50);
         
-        VR.HOA(r,a) = calc_entropy(ATO);
+        %VR.HOA(r,a) = calc_entropy(ATO);
+        
+        %figure(6); hold on; histogram(ATO,20)
+        %pause(1)
         
          % unconditional: the entropy of the observed outcome times distribution = VR.waitTimes
         % this is parameterized by lambda_o
         %VR.HO(r,a) = 1-log(VR.lambda_o(r,a)); %1-log(lambda_o)
         
-        VR.HO(r,a) = calc_entropy(RTO);
+        %VR.HO(r,a) = calc_entropy(RTO);
+        VR.HO(r,a) = 1-log(lambda_a/ratio(r));
+        
+        
+        temp = ((-lambda_a/ratio(r))*(log(ratio(r))))/(lambda_a-(lambda_a/ratio(r)));
+        VR.HOA(r,a) = exp(temp)*VR.HO(r,a);
+        VR.C(r,a) = 1-exp(temp);
     end
 end
 
 %% test
-FR.HO = 1-log(FR.lambda_o);
-VR.HO = 1-log(FR.lambda_o);
+%FR.HO = 1-log(FR.lambda_o);
+%VR.HO = 1-log(FR.lambda_o);
 %% calculate information
 FR.I = FR.HO-FR.HOA;
 VR.I = VR.HO-VR.HOA;
@@ -283,8 +296,8 @@ prettyplot
 % VR schedules, A-O contingency is strong, because the faster they respond,
 % the sooner on average a reinforcer is delivered.
 subplot 224
-C = VR.I./VR.HO;
-plot(la',C','LineWidth', 1.5)
+VR.C = VR.I./VR.HO;
+plot(la',VR.C','LineWidth', 1.5)
 xlabel('action rate \lambda_a')
 ylabel('A-O contingency')
 axis([0 1 0 1])
@@ -292,6 +305,8 @@ axis square
 prettyplot
 
 suptitle('VR')
+save('VR_empirical.mat','VR')
+
 %% FR
 figure; hold on;
 subplot 221; hold on;
@@ -335,8 +350,8 @@ prettyplot
 % VR schedules, A-O contingency is strong, because the faster they respond,
 % the sooner on average a reinforcer is delivered.
 subplot 224
-C = FR.I./FR.HO;
-plot(la',C','LineWidth', 1.5)
+FR.C = FR.I./FR.HO;
+plot(la',FR.C','LineWidth', 1.5)
 xlabel('action rate \lambda_a')
 ylabel('A-O contingency')
 axis([0 1 0 1])
@@ -346,54 +361,26 @@ prettyplot
 
 suptitle('FR')
 
+save('FR_empirical.mat','FR')
+
 %% other metrics to look at
 figure; hold on;
 map = brewermap(9,'Blues');
 set(0, 'DefaultAxesColorOrder', map([3,5,7,9],:)) % first three rows
-%subplot 221; plot(la,1./VI.lambda_o); xlabel('\lambda_a');ylabel('1/lambda_o');prettyplot;
-%subplot 222; plot(la,VI.waitTimeMean);xlabel('\lambda_a');ylabel('1/lambda_o');prettyplot;% mean of the inter-outcome interval for diff action rates. this 1/lambda_o
-subplot 223; plot(la,VR.meanNumAct,'LineWidth', 1.5);xlabel('\lambda_a');ylabel('mean #A until reward');axis square;prettyplot; % mean number of actions till reward
+subplot 221; plot(la,VR.meanNumAct,'LineWidth', 1.5);ylabel('mean #A until reward');axis square;prettyplot; % mean number of actions till reward
 % mean number of actions till reward
-subplot 224; plot(la,VR.meanATO,'LineWidth', 1.5);xlabel('\lambda_a');ylabel('mean time A->O');axis square;prettyplot; % mean number of actions till reward
+title ('VR')
+subplot 222; plot(la,VR.meanATO,'LineWidth', 1.5);;ylabel('mean time A->O');axis square;prettyplot; % mean number of actions till reward
 %mean of the action to outcome distribtion (conditional entropy)
 legend('VR2','VR5','VR10','VR20')
 legend('boxoff')
-suptitle ('VR')
+title ('VR')
 
-figure;
-map = brewermap(9,'Greens');
-set(0, 'DefaultAxesColorOrder', map([3,5,7,9],:)) % first three rows
-
-%subplot 221; plot(la,1./FI.lambda_o);xlabel('\lambda_a');ylabel('1/lambda_o');prettyplot;
-%subplot 222; plot(la,FI.waitTimeMean);xlabel('\lambda_a');ylabel('1/lambda_o');prettyplot; % mean of the inter-outcome interval for diff action rates. this 1/lambda_o
-subplot 223; plot(la,FR.meanNumAct,'LineWidth', 1.5);xlabel('\lambda_a');ylabel('mean #A until reward');axis square;prettyplot; % mean number of actions till reward
-subplot 224; plot(la,FR.meanATO,'LineWidth', 1.5);xlabel('\lambda_a');ylabel('mean time A->O');axis square;prettyplot; % mean number of actions till reward
+subplot 223; plot(la,FR.meanNumAct,'LineWidth', 1.5);xlabel('\lambda_a (actions/sec)');ylabel('mean #A until reward');axis square;prettyplot; % mean number of actions till reward
+title ('FR')
+subplot 224; plot(la,FR.meanATO,'LineWidth', 1.5);xlabel('\lambda_a (actions/sec)');ylabel('mean time A->O (s)');axis square;prettyplot; % mean number of actions till reward
 legend('FR2','FR5','FR10','FR20')
 legend('boxoff')
 %mean of the action to outcome distribtion (conditional entropy)
-suptitle ('FR')
-
-
-%figure; 
-%subplot 222; plot(FR.waitTimeMean,VR.waitTimeMean,'.'); dline;xlabel('FR wait time');ylabel('VR wait time');prettyplot;% mean of the inter-outcome interval for diff action rates. this 1/lambda_o
-%subplot 223; plot(FR.meanNumAct,VR.meanNumAct,'.'); dline;xlabel('FR mean num actions');ylabel('VR mean number actions');prettyplot; % mean number of actions till reward 
-%subplot 224; plot(FR.meanATO,VR.meanATO,'.'); dline;xlabel('FR mean of H_{O|A}');ylabel('VR mean of H_{O|A}');prettyplot; % mean number of actions till reward 
- %mean of the action to outcome distribtion (conditional entropy)
-
- 
-% 
-% subplot 222; hold on;
-% HO = 1-log(la./ratio');
-% HOA = (la.*HO)./(la.*exp(-la));
-% plot(la',HO','--','LineWidth', 1.5);
-% plot(la',HOA','LineWidth', 1.5)
-% xlabel('action rate \lambda_a')
-% ylabel('conditional entropy H_{O|A}')
-% legend('VR2','VR5','VR10','VR20','Location','southeast')
-% legend('boxoff')
-% axis([0 2 0 5])
-% axis square
-% prettyplot
-
-
+title ('FR')
 end

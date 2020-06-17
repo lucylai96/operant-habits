@@ -1,4 +1,31 @@
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/');
+
+map = brewermap(4,'*RdBu');
+temp = map(3,:);
+map(3,:) = map(4,:);
+map(4,:) = temp;  % swap colors so darker ones are fixed
+set(0, 'DefaultAxesColorOrder', map) % first three rows
+set(0, 'DefaultLineLineWidth', 1.5) % first three rows
+load('VI_empirical.mat')
+load('VR_empirical.mat')
+load('FR_empirical.mat')
+
+figure; 
+subplot 121; hold on;
+la = linspace(0.1,1,20); % action rate (presses per second)
+
+plot(la,FR.I','Color',map(1,:))
+plot(la,VR.I','Color',map(2,:))
+plot(la,VI.I','Color',map(4,:))
+title('mutual information'); prettyplot 
+
+subplot 122; hold on;
+plot(la,FR.C','Color',map(1,:))
+plot(la,VR.C','Color',map(2,:))
+plot(la,VI.C','Color',map(4,:))
+legend('FR','VR','VI')
+title('contingency'); prettyplot
+
 %% VR schedules
 %close all
 %clear all;
