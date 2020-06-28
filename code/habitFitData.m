@@ -5,7 +5,7 @@ function habitFitData
 
 load('example_rats_cleaned.mat'); % load data
 %% timesteps
-sched.model = 2; % fit the beta
+sched.model = 3; % fit the beta
 sched.R = 20; % in deciseconds (VR/FR20*10 = 200)
 sched.I = 45; % in deciseconds  (VI/FI45*10 = 450)
 
@@ -13,7 +13,7 @@ sched.I = 45; % in deciseconds  (VI/FI45*10 = 450)
 type = {'FR' 'VR' 'FI' 'VI'}; % even though it's FR, there are still variable times
 
 % a loop to go through each session separately
-for typ = 4:length(type)   
+for typ = 1:length(type)   
     for ses = 1:3
         sched.type = type{typ};
         sched.timeSteps = timeSteps(typ,ses);
@@ -54,8 +54,8 @@ for typ = 4:length(type)
             % x0 = [0.03+rand*0.1  0.03+rand*0.1 0.03+rand*0.1  10];
            % [params(fit_i,:),error(fit_i)] = bads(@model,x0,[0.01 0.01 0.01 1],[.99 .99 .99 100],[0.01 0.01 0.01 1],[.8 .8 .8 100],[],[],input);
             
-            x0 = [0.03+rand*0.1  0.03+rand*0.1   0.03+rand*0.1 10];
-            [params(fit_i,:),error(fit_i)] = bads(@model,x0,[0.01 0.01 0.01 1],[.99 .99 .99 100],[0.01 0.01 0.01 1],[.8 .8 .8 100],[],[],input);
+            x0 = [0.03+rand*0.1  0.03+rand*0.1  0.03+rand*0.1  0.03+rand*0.1 10];
+            [params(fit_i,:),error(fit_i)] = bads(@model,x0,[0.01 0.01 0.01 0.01 1],[.99 .99 .99 .99 100],[0.01 0.01 0.01 0.01 1],[.8 .8 .8 .8 100],[],[],input);
         
         
         end
@@ -88,16 +88,16 @@ sched = input.sched;
 %% initialize
 agent.alpha_w = params(1);
 agent.alpha_t = params(2);
-agent.alpha_b = params(1);  % only relevant for model 3 and 4
+agent.alpha_r = params(3);  % only relevant for model 3 and 4
 
-sched.acost = params(3);    % action cost
+sched.acost = params(4);    % action cost
 
-sched.beta = params(4);     % starting beta; high beta = low cost. beta should increase for high contingency
+sched.beta = params(5);     % starting beta; high beta = low cost. beta should increase for high contingency
 %sched.cmax = params(6);     % max complexity
 sched.k = 1;
 
-[O,T] =  habitSchedule(sched);
-results = habitAgent(O,T, sched, agent);
+%[O,T] =  habitSchedule(sched);
+results = habitAgent(sched, agent);
 
 
 % bernoulli log liklihood for each second

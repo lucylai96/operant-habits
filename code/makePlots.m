@@ -1,73 +1,3 @@
-function [results]=habitDriver(params,type)
-% PURPOSE: for simulating model behavior across all 4 types by specifying
-% the schedule parameter
-%
-% NOTES:
-%
-% INPUT: conditions:
-%        arm = [2 5 10 20]
-%        model = [1 2 3 4]
-%        timeSteps
-%        ac = [0 0.01 0.1]
-%        cmax = [0.2 0.5 0.8] % only model 4
-%        beta = [10 20 30 40 50] % only for model 3
-%        deval = [0 1]
-%
-% Written by Lucy Lai (May 2020)
-
-clear all
-
-addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                  % various statistical tools
-%addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/InfoTheory');      
-
-% params: [arm model timeSteps acost beta cmax deval]
-if nargin <1
-    params = [10 4 1800 0.05 1 100 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr
-    type = {'FR','VR','FI','VI'};
-end
-
-
-%% unpack parameters
-arm = params(1);
-model = params(2);
-timeSteps = params(3);
-ac = params(4);
-beta = params(5);
-cmax = params(6);
-deval = params(7);
-
-%% initialize
-sched.R = arm;
-sched.I = sched.R;
-sched.model = model;     % which lesioned model to run
-sched.acost = ac;   % action cost
-sched.beta = beta;     % starting beta; high beta = low cost. beta should increase for high contingency
-sched.cmax = cmax;     % max complexity (low v high)
-% for VI only
-sched.times = contingency_generateVI(sched.I); % pre-generated wait times before reward
-% for VR only
-sched.actions = contingency_generateVR(sched.R); % pre-generated number of actions before reward
-sched.k = 1;
-sched.timeSteps = timeSteps;
-
-if deval == 1
-    sched.devalTime = timeSteps;                % timestep where outcome gets devalued
-    sched.timeSteps = timeSteps+300;             % devaluation test period = 5 mins (300 timeSteps)
-else
-    sched.devalTime = timeSteps;                % timestep where outcome gets devalued
-end
-
-
-for i = 1:length(type)
-    sched.type = type{i};
-    %[O,T] =  habitSchedule(sched);
-    results(i) = habitAgent(sched);
-end
-
-makePlots(results, sched, type)
-
-end
-
 
 function makePlots(results, sched, type)
 %% init color map
@@ -97,34 +27,29 @@ ylabel('cumulative # actions')
 prettyplot
 
 %% probability of action (learned policy weights)
+figure;subplot 121; hold on;
+colormap(flipud(gray))
 for i = 1:length(type)
     results(i).Pa = exp(results(i).theta);
     results(i).Pa = results(i).Pa./sum(results(i).Pa,2);
+    imagesc([results(i).Pa(:,2,end)])
 end
 
-figure; subplot 121;
-colormap(flipud(gray))
-imagesc([results(1).Pa(:,2,end) results(3).Pa(:,2,end)])
-set(gca,'xtick',[1:2],'xticklabel',type([1 3]))
+set(gca,'xtick',[1:size(results,2)],'xticklabel',type)
 ylabel('state')
-subplot 122;
-colormap(flipud(gray))
-imagesc([results(2).Pa(:,2,end) results(4).Pa(:,2,end)])
-set(gca,'xtick',[1:2],'xticklabel',type([2 4]))
-subprettyplot(1,2)
+title('p(a=press)')
+prettyplot
 
 %% visualize weights
-figure; subplot 121;
+subplot 122; hold on 
 colormap(flipud(gray))
-imagesc([results(1).w(end,:)' results(3).w(end,:)'])
-set(gca,'xtick',[1:2],'xticklabel',type([1 3]))
+for i = 1:length(type)
+imagesc([results(i).w(end,:)'])
+end
+set(gca,'xtick',[1:size(results,2)],'xticklabel',type)
 ylabel('state')
-subplot 122;
-colormap(flipud(gray))
-imagesc([results(2).w(end,:)' results(4).w(end,:)'])
-set(gca,'xtick',[1:2],'xticklabel',type([2 4]))
-subprettyplot(1,2)
-
+title('V(s)')
+prettyplot
 
 %% outcome and action rates over time
 win = 100; % # seconds moving window
@@ -307,10 +232,6 @@ ylabel('reward')
 prettyplot
 set(gcf, 'Position',  [300, 300, 1000, 300])
 
-figure (100); hold on;
-for i = 1:length(type)
-plot(mean(results(i).cost(end-num:end)), mean(results(i).rho(end-num:end)),'.','Color',map(i,:),'MarkerSize',20 )
-end
 %% MI (action = press)
 
 % figure; hold on;
@@ -366,5 +287,4 @@ end
 ylabel('contingency')
 xlabel('action rate \lambda_a')
 prettyplot
-
 end

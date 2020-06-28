@@ -115,7 +115,8 @@ for i = 1:length(int)
         FI.meanNumAct(i,a) = mean(numAct);
         FI.meanATO(i,a) = nanmean(ATO);
         
-       %FI.HOA(i,a) = calc_entropy(ATO);
+       FI.HOA(i,a) = calc_entropy(ATO);
+       histogram(ATO,50);
         %(a*FI.HO)./(a+exp(-a))
         
         % unconditional: the entropy of the observed outcome times distribution = FI.waitTimes
@@ -125,13 +126,13 @@ for i = 1:length(int)
         % number* of randomly chosen moments in time as the a-->o
         
         
-      %  FI.HO(i,a) = 1-log(FI.lambda_o(i,a)); %1-log(lambda_o) = 1-log(1/I)
-        %FI.HO(i,a) = calc_entropy(RTO);
-        FI.HO(i,a) = 0;
+        FI.HO1(i,a) = 1-log(FI.lambda_o(i,a)); %1-log(lambda_o) = 1-log(1/I)
+        FI.HO(i,a) = calc_entropy(RTO);
+        %FI.HO(i,a) = 0;
        
-        temp = ((-1/int(i))*(log(lambda_a)-log(1/int(i))))/(lambda_a-(1/int(i)));
-        FI.HOA(i,a)  = exp(temp)*FI.HO(i,a);
-        FI.C(i,a) =  1-exp(temp);
+        %temp = ((-1/int(i))*(log(lambda_a)-log(1/int(i))))/(lambda_a-(1/int(i)));
+        %FI.HOA(i,a)  = exp(temp)*FI.HO(i,a);
+        %FI.C(i,a) =  1-exp(temp);
         
         
         %% VR world | variable ratio

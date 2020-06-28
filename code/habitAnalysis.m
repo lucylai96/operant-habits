@@ -11,14 +11,18 @@ map(4,:) = temp;                     % swap colors so darker ones are fixed
 set(0, 'DefaultAxesColorOrder', map) % first three rows
 
 % some default parameters
-sched.model = 4;      % which lesioned model to run
-sched.acost = 0.05;   % action cost
+sched.model = 2;      % which lesioned model to run
+sched.acost = 0.1;   % action cost
 sched.beta = 100;     % starting beta; high beta = low cost. beta should increase for high contingency
-sched.cmax = 0.5;     % max complexity (low v high)
+%sched.cmax = 0.5;     % max complexity (low v high)
 
 switch fig
     
     case 1
+        agent.alpha_w = 0.2;
+        agent.alpha_t = 0.2;
+        agent.alpha_r = 0.2;
+        
         %% REED 2001
         
         sched.R = 8;
@@ -31,20 +35,20 @@ switch fig
         sched.actions(sched.actions > 16) = [];
         
         sched.k = 1;
-        sched.timeSteps = 2200;
+        sched.timeSteps = 180;
         sched.devalTime = sched.timeSteps;                 % timestep where outcome gets devalued
         sched.type = 'VR';
         
-        [O,T] =  habitSchedule(sched);
-        VR = habitAgent(O,T, sched);
+        %[O,T] =  habitSchedule(sched);
+        VR = habitAgent(sched,agent);
         
         outTimes = find(VR.x==2);                     % find time between outcomes
         
         sched.times = [diff(outTimes) diff(outTimes)];
         sched.type = 'VI';
         
-        [O,T] =  habitSchedule(sched);
-        VIyoked = habitAgent(O,T, sched);
+        %[O,T] =  habitSchedule(sched);
+        VIyoked = habitAgent(sched,agent);
         
         % Response rates were higher on the VR than on the VI schedule.
         figure; hold on; subplot 121; hold on;
@@ -67,8 +71,8 @@ switch fig
         sched.times(sched.times>40) = [];
         sched.type = 'VI';
         
-        [O,T] =  habitSchedule(sched);
-        VI = habitAgent(O,T, sched);
+        %[O,T] =  habitSchedule(sched);
+        VI = habitAgent(sched,agent);
         
         outTimes = find(VI.x==2);                     % find time between outcomes
         k = 1;
@@ -80,8 +84,8 @@ switch fig
         sched.actions = [numAct numAct];
         sched.type = 'VR';
         
-        [O,T] =  habitSchedule(sched);
-        VRyoked = habitAgent(O,T, sched);
+        %[O,T] =  habitSchedule(sched);
+        VRyoked = habitAgent(sched,agent);
         
         % Response rates were higher on the VR than on the VI schedule.
         
@@ -110,7 +114,7 @@ switch fig
         I = [30 53 109];
         % delay = [16 32 64];
         sched.k = 1;
-        sched.timeSteps = 6000;
+        sched.timeSteps = 3000;
         sched.devalTime = sched.timeSteps;                 % timestep where outcome gets devalued
         
         for i = 1:length(R)
@@ -152,16 +156,16 @@ switch fig
         type = {'FR' 'VR' 'FI' 'VI'};
         load('example_rats_cleaned.mat'); % load data
         
-        sched.model = 2; % fit the beta
+        sched.model = 3; % fit the beta
         sched.R = 20; % in deciseconds (VR/FR20*10 = 200)
         sched.I = 45; % in deciseconds  (VI/FI45*10 = 450)
-        figure; hold on; sp = 1;
+        sp = 1;
         for typ = 1:length(type)  % for all sched types
             for ses = 1:3         % for all sessions
                 sched.type = type{typ};
                 sched.timeSteps = timeSteps(typ,ses);
                 load(strcat(sched.type,'_params_s',num2str(ses),'.mat')); % get params and error
-                
+                %params = [0.0151    0.0122    0.7151    0.0702    2.1222];
                 %params = mean(params);
                 
                 %% for FR only
@@ -190,15 +194,19 @@ switch fig
                     data.reward = VI45.session(ses).training.reward_binned;
                 end
                 
+                %% sanity checks (plots)
+                %makePlotsData(data.lever,data.reward,{sched.type})
                 % simulate valued and devalued
                 sched.deval = 1;
-                model_devalued = habitSimulate(params, sched);
+                [model_devalued, sched] = habitSimulate(params, sched);
+                makePlotsData(data, model_devalued, {sched.type})
                 
-                sched.deval = 0; sched.timeSteps = sched.timeSteps+300;
-                model_valued = habitSimulate(params, sched);
+                sched.deval = 0;
+                [model_valued, sched] = habitSimulate(params, sched);
+                makePlotsData(data, model_valued, {sched.type})
                 
                 
-                % sanity checks (compare training)
+                %% sanity checks (compare training)
                 MD.train_reward(typ,ses) = sum(model_devalued.x(1:timeSteps(typ,ses))==2)/timeSteps(typ,ses);
                 MD.train_lever(typ,ses) = sum(model_devalued.a(1:timeSteps(typ,ses))==2)/timeSteps(typ,ses);
                 
@@ -216,17 +224,17 @@ switch fig
                 DV.test_lever(typ,ses) = test_lever_rates.valued(typ,ses)/60;
                 
                 % plot change in lever press rate
-                % figure(1); hold on;
+                figure(100); hold on;
                 subplot(4,3,sp); hold on;
                 bar(1,[DV.test_lever(typ,ses) DD.test_lever(typ,ses)]./DD.train_lever(typ,ses)); % data (devalued, valued)
                 bar(2,[MV.test_lever(typ,ses) MD.test_lever(typ,ses)]./[MV.train_lever(typ,ses) MD.train_lever(typ,ses)]); % model (devalued, valued)
                 set(gca,'xtick',[1 2],'xticklabel',{'data' 'model'})
                 prettyplot
                 
-                % figure(2); hold on;
-                % subplot(4,3,sp); hold on;
-                % bar(1,[DV.test_lever(typ,ses) DD.test_lever(typ,ses)]); % data (devalued, valued)
-                % bar(2,[MV.test_lever(typ,ses) MD.test_lever(typ,ses)]); % model (devalued, valued)
+                figure(200); hold on;
+                subplot(4,3,sp); hold on;
+                bar(1,[DV.test_lever(typ,ses) DD.test_lever(typ,ses)]); % data (devalued, valued)
+                bar(2,[MV.test_lever(typ,ses) MD.test_lever(typ,ses)]); % model (devalued, valued)
                 
                 
                 set(gca,'xtick',[1 2],'xticklabel',{'data' 'model'})
@@ -238,7 +246,7 @@ switch fig
         end
         subplot (4,3,1)
         title('2 days')
-       
+       legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
         subplot (4,3,2)
         title('10 days')
         subplot (4,3,3)
