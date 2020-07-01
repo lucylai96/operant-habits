@@ -45,7 +45,7 @@ else
 end
 rho = 0;                % avg reward
 
-nS = sched.R*100;
+nS = sched.R*3;
 d = 1:nS;    % number of features
 mu_d = 1:nS; % mean of features
 wa = 0.1;     % weber fraction for actions
@@ -85,7 +85,7 @@ theta  = zeros(length(phi),2);  % policy weights
 w = zeros(length(phi),1);       % value weights
 
 win = 60; % calculate contingency over this window, 30 seconds
-ps = zeros(length(phi)-1,1);
+ps = zeros(length(phi),1);
 paa = [1 1];
 
 for t = 2:sched.timeSteps
@@ -210,17 +210,20 @@ for t = 2:sched.timeSteps
     
     %% policy complexity
     betatheta = beta.*(theta'*phi)';
-    paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;             % total marginal action distribution
-    paa = paa+0.01; paa = paa./sum(paa);
-    
+     
     if t>2
         ps = (sum(results.ps)./sum(results.ps(:)))';         % probability of being in a state
+        paa = pas;
     end
     
     % should encompass all states and actions (entire policy)
-    pas = exp(beta.*(theta(2:end,:)'*ps)'+log(paa));                    % entire state dep policy
-    pas = pas./sum(pas);
+    pas = exp(beta.*(theta'*ps)'+log(paa));                    % entire state dep policy
+    %pas = pas./sum(pas,2);
     %pas = pas(2:end,:);
+    
+    %paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;             % total marginal action distribution
+    %paa = paa+0.01; paa = paa./sum(paa);
+    %paa = sum(results.ps.*pas);
    
     %mi = sum(ps.*sum(pas.*log(pas./paa),2));     % mutual information
     %mi = sum(pi_as.*log(pi_as./pa));            % mutual information
@@ -317,7 +320,7 @@ for t = 2:sched.timeSteps
     results.v(t) = w'*phi; % estimated value
     results.cost(t,:) = cost;
     results.cost0(t,:) = sum(cost0);
-    results.ps(t,:) = phi(2:end,:);
+    results.ps(t,:) = phi;
     results.pa(t,:) = pa(a(t));
     results.mi(t) = mi;
     results.beta(t) = beta;

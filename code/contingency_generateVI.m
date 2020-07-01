@@ -8,5 +8,5 @@ I = binornd(1,p*ones(1,50000));
 
 intTimes = find(I==1); % interval times 
 waitTimes = diff(intTimes); % wait times between intervals
-waitTimes(waitTimes>int*3) = []; % get rid of ones > 100
+waitTimes(waitTimes>int*2) = []; % get rid of ones > 100
 end
