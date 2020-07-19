@@ -1,4 +1,4 @@
-function results = habitAgent(sched, agent, input)
+function results = habitAgentCont(sched, agent, input)
 % PURPOSE: Reward-complexity in free-operant learning
 %
 % INPUTS:
@@ -102,6 +102,73 @@ for t = 2:sched.timeSteps
     phi0 = phi;
     phi = [1; Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
     phi(isnan(phi)) = 0;
+    
+    %% contingency (ignore this)
+    if t>win
+        %outTimes = find(x(1:t-1)==2); % 30 seconds
+        %     if length(outTimes)<3
+        %         ct = 1; % contingency is 0
+        %     else
+        %HO = entropy(diff(outTimes));
+        %actTimes = find(a(1:t-1)==2); % 30 seconds
+        
+        rr = sum((a(t-win:t-1)==2)+(x(t-win:t-1)==2)==2); % total number of reinforced actions made
+        pR(t) = rr/sum(a(t-win:t-1)==2); % total number of actions made in some time window
+        
+        c = sum((a(t-win:t-1)==1 + x(t-win:t-1)==2)==2); % total number of outcomes when there wasnt an action
+        
+        % now if you only want contingency in a certain time window...
+        
+        %         for i = 2:length(outTimes)
+        %             at = actTimes((actTimes>outTimes(i-1))+(actTimes<=outTimes(i))==2); % only the relevant actions
+        %             ct(i) = length(at)/(length(at)+1); % probability that a response is reinforced (non-reinforced actions/reinforced actions)
+        %             %HOA(i) = entropy(outTimes(i)-at);
+        %         end
+        %end
+    else
+        rr = sum((a(1:t-1)==2)+(x(1:t-1)==2)==2); % total number of reinforced actions made
+        pR(t) = rr/sum(a(1:t-1)==2); % total number of actions made in some time window
+        
+        %c = sum((a(t-win:t-1)==1 + x(t-win:t-1)==2)==2); % total number of outcomes when there wasnt an action
+        
+    end
+    
+    if isnan(pR(t))
+        pR(t) = 0;
+    end
+    %
+    %     if t>100
+    %         outTimes = find(x(t-win:t-1)==2);
+    %         if isempty(outTimes) || length(outTimes) <= 5 % if you haven't seen any rewards, contingency is automatically 0
+    %             C = 0;
+    %         end
+    %
+    %         if length(outTimes) > 5
+    %             k = 1;
+    %             ho = entropy(diff(find(x(t-win:t-1)==2)));
+    %             for nt = t-win:t
+    %                 if  k < length(outTimes) && nt <= outTimes(k)
+    %                     if a(nt) == 2
+    %                         ato(nt) = outTimes(k)-nt;% calculate action-to-next outcome
+    %                         %numAct(k) = numAct(k)+1;% how many actions before next outcome
+    %                     end
+    %                 elseif k < length(outTimes) %if current time is not less than the time of next reward
+    %                     k = k+1; %go to next reward time
+    %                     if a(nt) == 2
+    %                         ato(nt) = outTimes(k)-nt;% calculate time-to-next outcome, action to outcome
+    %                     end
+    %
+    %                 end
+    %             end
+    %         end
+    %
+    %         %C = contingency(a,x,t,win);
+    %         %C(c,:) = mutInfo(a(t-c:t-1),x(t-c:t-1))/entropy(x(t-c:t-1)); % contingency
+    %
+    %     end
+    %     C(isnan(C)) = 0;
+    
+    % [~,ct] = min(abs(pR(t)-mu_c));
     
     
     %% action history
