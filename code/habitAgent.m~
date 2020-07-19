@@ -1,52 +1,58 @@
 function results = habitAgent(sched, agent, input)
-% PURPOSE: Reward-complexity in free-operant learning
+% PURPOSE: Free-operant learning
+% AUTHOR: Lucy Lai
+%
+% USAGE: results = habitTD(x,O,T)
 %
 % INPUTS:
-%   sched - details about the operant schedule
-%   agent (optional) - learning parameters, if simulating from params
-%   input (optional) - some data used to seed (if in fitting mode)
+%   x - observations (1 = nothing, 2 = reward)
+%   a - last action (1 = nothing, 2 = press lever)
+%   O - [S' x A x O] observation distribution: O(i,j,m) = P(x'=m|s'=i, a=j)
+%   probability of observing x in state s' after taking action a
+%   T - [S x S' x A] transition distribution: T(i,j,k) = P(s'=j|s=i, a=k)
+%   probability of transitioning to state s' from state s after taking action a
 %
 % OUTPUTS:
-%   results - structure
-%
-% NOTES:
-%
-% Written by Lucy Lai (May 2020)
+%   results - structure with the following fields:
+%        .w - weight vector at each time point (prior to updating)
+%        .b - belief state at each time point (prior to updating)
+%        .rpe - TD error (after updating)
 
 
 %% initialization
 % states
 beta = sched.beta;    % beta
 acost = sched.acost;  % action cost
-deval = ones(1,sched.timeSteps);        % a vector indicating when devaluation "turns on"
-deval(:,sched.devalTime:end) = 0;       % 0 means devaluation mode
+deval = ones(1,sched.timeSteps);        % a vector of when devaluation turns on
+deval(:,sched.devalTime:end) = 0; % 0 means devaluation model
 
 % learning rates
-if nargin <2 % if simulating without input parameters
+if nargin <2
     alpha_w = 0.1;          % value learning rate
     alpha_t = 0.1;          % policy learning rate
     alpha_r = 0.1;          % rho learning rate
     alpha_b = 1;            % beta learning rate
-    wa = 0.15;              % weber fraction for actions
-    wt = 0.2;               % weber fraction for time
+    wa = 0.15;     % weber fraction for actions
+    wt = 0.2;    % weber fraction for time
     
-else % if simulating with input parameters
+else
     alpha_w = agent.alpha_w;          % value learning rate
     alpha_t = agent.alpha_t;          % policy learning rate
     alpha_b = agent.alpha_b;          % beta learning rate
     alpha_r = agent.alpha_r;          % rho learning rate
     
 end
+rho = 0;                % avg reward
 
-nS = sched.R*2; % number of features
-d = 1:nS;       % number of features
-mu_d = 1:nS;    % mean of features
-wa = 0.1;       % weber fraction for actions
-wt = 0.15;      % weber fraction for time
-t = 1:nS;       % time or actions
-%c = linspace(0,1,nS);
-%mu_c = linspace(0,1,nS);
-%wc = 0.01; 
+nS = sched.R*2;
+d = 1:nS;    % number of features
+mu_d = 1:nS; % mean of features
+wa = 0.1;     % weber fraction for actions
+wt = 0.15;    % weber fraction for time
+t = 1:nS;    % time or actions
+c = linspace(0,1,nS);
+mu_c = linspace(0,1,nS);
+wc = 0.01; % contingency is NOT scalar
 %Cdt = zeros(nS, size(linspace(0,1,nS),2)); % d dimensions
 for i = 1:length(d)
     Adt(i,:) = exp((-1/2)*((t-mu_d(i))/(wa*mu_d(i))).^2);
@@ -69,10 +75,9 @@ phi = [1; Adt(:,1); Tdt(:,1)]; % features
 ps = zeros(length(phi)-1,1);
 paa = [1 1];
 
-x = [2]; % observation array init
-a = [2]; % action array init
-rho = 0;         % avg reward init
-paa = [0.5 0.5]; % p(a) init
+x = [2];
+a = [2];
+paa = [0.5 0.5];
 k = 0;
 dI = 0;
 dV = 0;
@@ -168,7 +173,7 @@ for t = 2:sched.timeSteps
     %     end
     %     C(isnan(C)) = 0;
     
-    % [~,ct] = min(abs(pR(t)-mu_c));
+    [~,ct] = min(abs(pR(t)-mu_c));
     
     
     %% action history

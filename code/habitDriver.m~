@@ -27,7 +27,7 @@ addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                 
 
 % params: [arm model timeSteps ac beta cmax deval]
 if nargin <1
-    params =  [20 4 1800 0.12 2 20 1]; % 1800 timesteps = 30 minutes, 3600 = 1hr
+    params =  [20 4 3000 0.1 2 100 1]; % 1800 timesteps = 30 minutes, 3600 = 1hr
     type = {'FR','VR','FI','VI'};
 end
 
@@ -209,7 +209,7 @@ subprettyplot(4,1)
 set(gcf, 'Position',  [300, 300, 700, 500])
 
 
-%% action rate before and after devaluation (avg over many iters)
+%% action rate before and after devaluation
 if sched.devalTime ~= timeSteps
     devalWin = timeSteps-sched.devalTime;
     
@@ -223,7 +223,6 @@ if sched.devalTime ~= timeSteps
         b(2).EdgeColor = map(i,:);
         b(2).LineWidth = 2;
         
-        results(i).devalScore = pre_deval - post_deval;
     end
     ylabel('action (press) rate')
     legend('before','after','FontSize',15,'Location','NorthWest'); legend('boxoff')
@@ -231,20 +230,23 @@ if sched.devalTime ~= timeSteps
     
     
     subplot 122; hold on; % change in action rate
+    % change in action rate
     for i = 1:length(type)
+        results(i).devalScore = sum(results(i).a(sched.devalTime-devalWin:sched.devalTime)-1)/devalWin - sum(results(i).a(sched.devalTime+1:end)-1)/devalWin;
         bar(i,results(i).devalScore,'FaceColor',map(i,:));
     end
     ylabel('devaluation score (pre-post)')
     axis([0 5 0 0.5])
     set(gca,'xtick',[1:4],'xticklabel',type)
     
+    % beta at time of deval vs deval score
     subprettyplot(1,2)
     
     set(gcf, 'Position',  [300, 300, 800, 300])
     
     %% beta relationship with deval score
     
-    figure(100); subplot 121;hold on;
+    figure(300); subplot 121;hold on;
     for i = 1:length(type)
         plot(mean(results(i).beta(sched.devalTime-win:sched.devalTime)),results(i).devalScore,'.','Color',map(i,:),'MarkerSize',30);
     end
