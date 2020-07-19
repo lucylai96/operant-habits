@@ -1,4 +1,4 @@
-function results = habitAgent(sched, agent)
+function results = habitAgent(sched, agent, input)
 % PURPOSE: Free-operant learning
 % AUTHOR: Lucy Lai
 %
@@ -31,21 +31,20 @@ if nargin <2
     alpha_w = 0.1;          % value learning rate
     alpha_t = 0.1;          % policy learning rate
     alpha_r = 0.1;          % rho learning rate
-    alpha_b = 0.1;            % beta learning rate
+    alpha_b = 1;            % beta learning rate
     wa = 0.15;     % weber fraction for actions
     wt = 0.2;    % weber fraction for time
     
 else
     alpha_w = agent.alpha_w;          % value learning rate
     alpha_t = agent.alpha_t;          % policy learning rate
-    %alpha_b = agent.alpha_b;          % beta learning rate
+    alpha_b = agent.alpha_b;          % beta learning rate
     alpha_r = agent.alpha_r;          % rho learning rate
-
     
 end
 rho = 0;                % avg reward
 
-nS = sched.R*100;
+nS = sched.R*2;
 d = 1:nS;    % number of features
 mu_d = 1:nS; % mean of features
 wa = 0.1;     % weber fraction for actions
@@ -71,18 +70,21 @@ end
 
 
 % initial values
-num = 5;   % marginal action probability over the last num seconds
+num = sched.R;   % marginal action probability over the last num seconds
 %phi = [1; Adt(:,1); Tdt(:,1); Cdt(:,end)]; % features
 %imagesc([Adt; Tdt; Cdt])
 phi = [1; Adt(:,1); Tdt(:,1)]; % features
 %phi = [1; Cdt(:,end)]; % features
-x = 2;
-a = 2;
+x = [2];
+a = [2];
+paa = [0.5 0.5];
 k = 0;
-dI=0;
+dI = 0;
+dV = 0;
 % weights
 theta  = zeros(length(phi),2);  % policy weights
 w = zeros(length(phi),1);       % value weights
+Q = zeros(length(phi),2);  % state-action values
 
 win = 60; % calculate contingency over this window, 30 seconds
 ps = zeros(length(phi)-1,1);
@@ -99,8 +101,9 @@ for t = 2:sched.timeSteps
     na = sum(a(rt:t-1)==2); % number of actions since last reward
     nt = t-rt; % timesteps since last reward
     
-    if nt>nS
+    if nt>nS || na>nS
         nt = nS;
+        na = nS;
     end
     
     if na>nS || nt>nS
@@ -177,6 +180,7 @@ for t = 2:sched.timeSteps
     phi0 = phi;
     %phi = [1; Adt(:,na); Tdt(:,nt); Cdt(:,ct)]; % features composed of indexed by action na and time t since last reward, 100 features to sum over at time nt
     %phi = [1; Cdt(:,ct)]; % features composed of indexed by action na and time t since last reward, 100 features to sum over at time nt
+    
     phi = [1; Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward, 100 features to sum over at time nt
     
     phi(isnan(phi)) = 0;
@@ -190,44 +194,59 @@ for t = 2:sched.timeSteps
     pa = pa+0.01; pa = pa./sum(pa);
     
     %% take an action according to policy
-    pi_as = exp(beta.*(theta'*phi)'+log(pa));
-    
+    pi_as = exp(beta.*(theta'*phi)' + log(paa));
+    pi_as(pi_as>100) = 100;
+    pi_as(pi_as<-100) = -100;
     if sum(pi_as) == 0
         pi_as = [0.5 0.5];
     end
     pi_as = pi_as./sum(pi_as);
+    pi_as = pi_as+0.01; pi_as = pi_as./sum(pi_as);
     
-    % policy sampled stochastically
-    if rand < pi_as(1)
-        a(t) = 1;      % null
+    
+    if exist('input')==1 && t < 200 % seed the fitter with data
+        a(t) = input(t)+1; % 0 means nothing, 1 means lever press
     else
-        a(t) = 2;      % press lever
+        % policy sampled stochastically
+        if rand < pi_as(1)
+            a(t) = 1;      % null
+        else
+            a(t) = 2;      % press lever
+        end
     end
-    
+    % policy deterministic
+    %     if pi_as(1) > pi_as(2)
+    %         a(t) = 1;      % null
+    %     else
+    %         a(t) = 2;      % press lever
+    %     end
+    paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;             % total marginal action distribution
+    paa = paa+0.01; paa = paa./sum(paa);
     
     %% observe reward and new state
     [x(t), sched] = habitWorld(t, a, x, sched);
     
     %% policy complexity
-    betatheta = beta.*(theta'*phi)';
-    paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;             % total marginal action distribution
-    paa = paa+0.01; paa = paa./sum(paa);
+    %     betatheta = beta.*(theta'*phi)';
     
     if t>2
-        ps = (sum(results.ps)./sum(results.ps(:)))';         % probability of being in a state
+        ps = (sum(results.ps,2)./sum(results.ps(:)));         % probability of being in a state
     end
-    
-    % should encompass all states and actions (entire policy)
-    pas = exp(beta.*(theta(2:end,:)'*ps)'+log(paa));                    % entire state dep policy
-    pas = pas./sum(pas);
+    %
+    %     % should encompass all states and actions (entire policy)
+    pas = exp(beta.*(theta(2:end,:))+log(paa));                    % entire state dep policy
+    pas = pas./sum(pas,2);
     %pas = pas(2:end,:);
-   
-    %mi = sum(ps.*sum(pas.*log(pas./paa),2));     % mutual information
+    %
+    mi = nansum(ps.*nansum(pas.*log(pas./paa),2));     % mutual information
     %mi = sum(pi_as.*log(pi_as./pa));            % mutual information
     %pas = sum(pas)./sum(pas(:));
-    mi = sum(pas.*log(pas./paa));            % mutual information
+    %mi = sum(pas.*log(pas./paa));            % mutual information
+    %     if mi >= log(2)
+    %         keyboard
+    %     end
     
-    cost0 = log(pi_as./pa(a(t)));
+    cost0 = log(pi_as./paa);
     cost = cost0(a(t));                                 % policy cost for that state-action pair
     
     
@@ -244,6 +263,14 @@ for t = 2:sched.timeSteps
             r = deval(t)*double(x(t)==2)-acost*(a(t)==2);   % yes action cost, no complexity cost
             rpe = r - rho + w'*(phi-phi0);
             rho =  rho + alpha_r *(r - rho);             % average reward update
+            if t>num
+                if x(t-1) == 2 && k > 2 %&& t<sched.devalTime % only update beta every time you see reward
+                    %dV = r - results.r(t-1);
+                    %dI = mean(results.cost(RT(k-1):RT(k))) - mean(results.cost(RT(k-2):RT(k-1))); % change in policy complexity
+                    dI = mean(results.mi(t-num:t-1)) - mean(results.mi(1:num)); % change in policy complexity
+                    
+                end
+            end
         case 3                                % yes action cost, yes complexity cost (fixed)
             r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
             rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
@@ -251,23 +278,19 @@ for t = 2:sched.timeSteps
         case 4                                % yes action cost, yes complexity cost (adaptive)
             r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
             % average reward update
-            if t>30
-                if x(t-1) == 2 && k > 2 %&& t<sched.devalTime% only update beta every time you see reward
-                % beta = x(t-1)
-                %dI = costt - mean(results.cost(t-30:t-1)); % change in policy complexity
+            if t>2*num
+                %if x(t-1) == 2 %&& k > 2 %&& t<sched.devalTime % only update beta every time you see reward
                 %dV = r - results.r(t-1);
                 %dI = mean(results.cost(RT(k-1):RT(k))) - mean(results.cost(RT(k-2):RT(k-1))); % change in policy complexity
-                dI = mean(results.mi(RT(k-1):RT(k))) - mean(results.mi(RT(k-2):RT(k-1))); % change in policy complexity
-                %dV = results.rho(RT(k))- results.rho(RT(k-1));
-                %dI = results.mi(RT(k))- results.mi(RT(k-1));
-                %beta = dI/dV;
+                dI = mean(results.mi(t-num)) - mean(results.mi(t-2*num:t-num)); % change in policy complexity
+                dV = mean(results.rho(t-num)) - mean(results.rho(t-2*num:t-num));
                 %beta = beta + alpha_b*(dI/rho);
-                beta = beta + alpha_b*(dI/rho);
+                beta = beta + alpha_b*dI;%
                 %dV = mean(results.rho(RT(k-1):RT(k)))-mean(results.rho(RT(k-2):RT(k-1))); % change in avg reward
                 %beta = dI/dV;
-                if beta<1
+                if beta<0
                     disp('!')
-                    beta = 1;
+                    beta = 0.1;
                 end
                 if beta > sched.cmax  %|| isnan(beta)
                     beta = sched.cmax;
@@ -277,13 +300,14 @@ for t = 2:sched.timeSteps
                 %                 else
                 %                     beta = 1;       % specify a floor
                 %                 end
-            %end
-            %if t>sched.devalTime
-            %    beta = mean(results.beta(t-num:t-1));
-                end
+                %end
+                %if t>sched.devalTime
+                %    beta = mean(results.beta(t-num:t-1));
+                
             end
             
-            rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
+            %rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
+            rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost; %adjustable beta but not incorperated into RPE
             rho =  rho + alpha_r *(r - rho);
     end
     
@@ -307,6 +331,7 @@ for t = 2:sched.timeSteps
     
     %theta(:,a(t)) = theta(:,a(t)) + alpha_t*rpe*b0;         % weight update (check policy gradient..)
     
+    Q(:,a(t)) = Q(:,a(t))+phi.*rho;
     %% store results
     %  results.b(t,:) = b0;
     results.w(t,:) = w0;
@@ -317,16 +342,19 @@ for t = 2:sched.timeSteps
     results.v(t) = w'*phi; % estimated value
     results.cost(t,:) = cost;
     results.cost0(t,:) = sum(cost0);
-    results.ps(t,:) = phi(2:end,:);
-    results.pa(t,:) = pa(a(t));
+    results.ps(:,t) = phi(2:end,:);
+    results.pa(t,:) = pa;
+    results.paa(t,:) = paa;
     results.mi(t) = mi;
     results.beta(t) = beta;
-    results.betatheta(t,:) = betatheta(a(t));
+    %results.betatheta(t,:) = betatheta(a(t));
     results.rt(k) = rt;
     results.dI(t) = dI;
+    results.dV(t) = dV;
     results.cont(t) = pR(t); % contingency
     
     results.pi_as(t,:) = pi_as;
+    results.Q(:,:,t) = Q;
     results.a(t) = a(t);
     results.x(t) = x(t);
     

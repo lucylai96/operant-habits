@@ -36,9 +36,9 @@ switch sched.type
     case 'VR'
         k = sched.k;
         
-        if k > length(sched.actions)
-            sched.actions = [sched.actions sched.actions];
-        end
+        %if k > length(sched.actions)
+        %    sched.actions = [sched.actions sched.actions];
+        %end
         if sum(A(find(X(1:t-1)==2,1,'last'):t)-1) > sched.actions(k)
             x = 2; % observe reward
             sched.k = sched.k+1;
@@ -56,9 +56,9 @@ switch sched.type
         %% VI
     case 'VI'
         k = sched.k;
-        if k > length(sched.times)
-            sched.times = [sched.times sched.times];
-        end
+        %if k > length(sched.times)
+        %    sched.times = [sched.times sched.times];
+        %end
         if length(X(find(X(1:t-1)==2,1,'last'):t-1)) >= sched.times(k) && A(t) == 2
             x = 2; % observe reward
             sched.k = sched.k+1;
