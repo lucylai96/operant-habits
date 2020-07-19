@@ -4,6 +4,8 @@ function habitAnalysis(fig)
 
 % plot settings
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools'); % various plotting tools
+addpath('./params'); % parameters
+
 map = brewermap(4,'*RdBu');
 temp = map(3,:);
 map(3,:) = map(4,:);
@@ -157,7 +159,7 @@ switch fig
         type = {'FR' 'VR' 'FI' 'VI'};
         load('example_rats_cleaned.mat'); % load data
         
-        sched.model = 4; % fit the beta
+        sched.model = 3; 
         sched.R = 20; % in deciseconds (VR/FR20*10 = 200)
         sched.I = 45; % in deciseconds  (VI/FI45*10 = 450)
         sp = 1;
@@ -247,7 +249,7 @@ switch fig
         end
         subplot (4,3,1)
         title('2 days')
-       legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
+        legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
         subplot (4,3,2)
         title('10 days')
         subplot (4,3,3)
