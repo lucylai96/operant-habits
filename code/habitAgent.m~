@@ -122,9 +122,8 @@ for t = 2:sched.timeSteps
     pi_as = pi_as+0.01; pi_as = pi_as./sum(pi_as);
     
     
-    if exist('input') == 1   % if fitting, condition on data 
-        a(t) = input(1,t)+1; % 1 means nothing, 2 means lever press
-        x(t) = input(2,t)+1; % 1 means nothing, 2 means reward
+    if exist('input')==1   % if fitting, seed with data (first 100 seconds)
+        a(t) = input(t)+1; % 0 means nothing, 1 means lever press
     else
         % policy sampled stochastically
         if rand < pi_as(1)
@@ -132,16 +131,15 @@ for t = 2:sched.timeSteps
         else
             a(t) = 2;      % press lever
         end
-        
-        % observe reward and new state
-        [x(t), sched] = habitWorld(t, a, x, sched);
     end
     
-    
-    %% policy complexity
     paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;             % total marginal action distribution
     paa = paa+0.01; paa = paa./sum(paa);
-   
+    
+    %% observe reward and new state
+    [x(t), sched] = habitWorld(t, a, x, sched);
+    
+    %% policy complexity
     if t>2
         ps = (sum(results.ps,2)./sum(results.ps(:)));              % probability of being in a state
     end
@@ -154,6 +152,7 @@ for t = 2:sched.timeSteps
  
     cost0 = log(pi_as./paa);
     cost = cost0(a(t));                                 % policy cost for that state-action pair
+    
    
     %% TD update
     switch sched.model % different models with different costs
@@ -228,7 +227,7 @@ for t = 2:sched.timeSteps
     results.rt(k) = rt;
     results.dI(t) = dI;
     results.dV(t) = dV;
-    %results.cont(t) = pR(t); % contingency
+    results.cont(t) = pR(t); % contingency
     
     results.pi_as(t,:) = pi_as;
     results.a(t) = a(t);

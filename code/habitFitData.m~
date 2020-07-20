@@ -142,7 +142,7 @@ n = ones(1,length(Y));
 nLL = -sum(Y.*log(p) + (n-Y).*log(1-p));
 
 %% sanity checks
-% figure; hold on;plot(1:sched.timeSteps,p'); x = ones(1,sched.timeSteps); A = binornd(repmat(x,[100,1]),repmat(p,[100,1])); figure; hold on;subplot 311; hold on;shadedErrorBar(1:sched.timeSteps,movmean(mean(A),200),movmean(std(A),200));plot(movmean(Y,200)); title('actions');prettyplot; subplot 313;hold on; plot(results(1).x,'LineWidth',3);plot(input.data(2,:),'LineWidth',3); title('rewards');prettyplot;subplot 312;hold on; plot(results(1).a,'LineWidth',3);plot(input.data(1,:),'LineWidth',3); title('actions');prettyplot; % were rewards delivered at the same time?
+% figure; hold on;plot(1:sched.timeSteps,p'); x = ones(1,sched.timeSteps); A = binornd(repmat(x,[100,1]),repmat(p,[100,1])); figure; hold on;subplot 311; hold on;shadedErrorBar(1:sched.timeSteps,movmean(mean(A),200),movmean(sem(A,1),200));plot(movmean(Y,200)); title('actions');prettyplot; subplot 313;hold on; plot(results(1).x,'LineWidth',3);plot(input.data(2,:),'LineWidth',3); title('rewards');prettyplot;subplot 312;hold on; plot(results(1).a,'LineWidth',3);plot(input.data(1,:),'LineWidth',3); title('actions');prettyplot; % were rewards delivered at the same time?
 
 
 end

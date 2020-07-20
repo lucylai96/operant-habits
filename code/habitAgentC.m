@@ -1,4 +1,4 @@
-function results = habitAgentCont(sched, agent, input)
+function results = habitAgentC(sched, agent, input)
 % PURPOSE: Reward-complexity in free-operant learning
 %
 % INPUTS:
