@@ -16,36 +16,38 @@ function results = habitAgent(sched, agent, input)
 
 %% initialization
 % states
-beta = sched.beta;    % beta
-acost = sched.acost;  % action cost
-deval = ones(1,sched.timeSteps);        % a vector indicating when devaluation "turns on"
-deval(:,sched.devalTime:end) = 0;       % 0 means devaluation mode
+beta = sched.beta;                      % beta
 
 % learning rates
 if nargin <2 % if simulating without input parameters
     alpha_w = 0.1;          % value learning rate
     alpha_t = 0.1;          % policy learning rate
     alpha_r = 0.1;          % rho learning rate
-    alpha_b = 1;            % beta learning rate
-    wa = 0.15;              % weber fraction for actions
-    wt = 0.2;               % weber fraction for time
-    
+    alpha_b = 0.1;          % beta learning rate
+    acost = 0.1;            % action cost
 else % if simulating with input parameters
     alpha_w = agent.alpha_w;          % value learning rate
     alpha_t = agent.alpha_t;          % policy learning rate
-    alpha_b = agent.alpha_b;          % beta learning rate
     alpha_r = agent.alpha_r;          % rho learning rate
+    alpha_b = agent.alpha_b;          % beta learning rate
+    acost = agent.acost;              % action cost
+end
+if (isequal(sched.type,'FR') || isequal(sched.type,'VR'))
+    nS = sched.R*20; % number of features
+end
+if (isequal(sched.type,'FI') || isequal(sched.type,'VI'))
+    nS = sched.I*20; % number of features
 end
 
-nS = sched.R*2; % number of features
+nS = 200;
 d = 1:nS;       % number of features
 mu_d = 1:nS;    % mean of features
 wa = 0.1;       % weber fraction for actions
-wt = 0.15;      % weber fraction for time
+wt = 0.1;      % weber fraction for time
 t = 1:nS;       % time or actions
 %c = linspace(0,1,nS);
 %mu_c = linspace(0,1,nS);
-%wc = 0.01; 
+%wc = 0.01;
 %Cdt = zeros(nS, size(linspace(0,1,nS),2)); % d dimensions
 for i = 1:length(d)
     Adt(i,:) = exp((-1/2)*((t-mu_d(i))/(wa*mu_d(i))).^2);
@@ -62,179 +64,252 @@ end
 % plot(Cdt'); % visualize features
 
 
-% initial values
-num = sched.R;   % marginal action probability over the last num seconds
-phi = [1; Adt(:,1); Tdt(:,1)]; % features
-ps = zeros(length(phi)-1,1);
-paa = [1 1];
-
-x = [2]; % observation array init
-a = [2]; % action array init
-rho = 0;         % avg reward init
-paa = [0.5 0.5]; % p(a) init
-k = 0;
-dI = 0;
-dV = 0;
-
 % weights
+phi = [Adt(:,1); Tdt(:,1)];     % features
 theta  = zeros(length(phi),2);  % policy weights
+%theta(:,1) = 1;                % bias to not do anything
+%theta(:,2) = -1;               % bias to not do anything
 w = zeros(length(phi),1);       % value weights
+num = 5;                        % marginal action probability over the last num seconds
 
-win = 60; % calculate contingency over this window, 30 seconds
-
-for t = 2:sched.timeSteps
-    %% define features
-    if x(t-1) == 2  % if you just saw reward
-        k = k+1;    % counter for # rewards
-        rt = t-1;   % log the timestep of last reward
-        RT(k) = rt; % counter for reward times
-    end
+for s = 1:sched.sessnum
+    % at start of every session reset these initial values
+    phi = [Adt(:,1); Tdt(:,1)]; % features
+    ps = zeros(length(phi),1);
+    x = [2];         % observation array init
+    a = [2];         % action array init
+    k = 1; na = 1; nt = 1; NA.rew(k) = na; NT.rew(k) = nt;
+    rho = 0;         % avg reward init
+    ecost = 0;
+    paa = [0.5 0.5]; % p(a) init
+    k = 0; rt = 1; dI = 0; dV = 0; V = 0;
+    sched.k = 1;
+    %sched.setrew = 1;
+    deval = ones(1,sched.timeSteps);        % a vector indicating when devaluation "turns on"
+    deval(:,sched.devalTime:end) = 0;       % 0 means devaluation mode
     
-    na = sum(a(rt:t-1)==2); % number of actions since last reward
-    nt = t-rt;              % timesteps since last reward
-    
-    if nt>nS || na>nS % a fix for conditions where the time / number of actions exceeds the number of features (rare)
-        nt = nS;
-        na = nS;
-    end
-    
-    phi0 = phi;
-    phi = [1; Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
-    phi(isnan(phi)) = 0;
-    
-    
-    %% action history
-    if t>num
-        pa(1) = sum(a(t-num:t-1)==1)/num; pa(2) = sum(a(t-num:t-1)==2)/num;             % trailing marginal action distribution
+    if ismember(s,sched.devalsess) && sched.deval == 1
+        timeSteps = sched.timeSteps+300;  % devaluation test period = 5 mins (300 timeSteps)
+        deval = ones(1,timeSteps);        % a vector indicating when devaluation "turns on"
+        deval(:,sched.devalTime:end) = 0;       % 0 means devaluation mode
     else
-        pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;
+        timeSteps = sched.timeSteps;
     end
-    pa = pa+0.01; pa = pa./sum(pa);
-    
-    %% action selection
-    pi_as = exp(beta.*(theta'*phi)' + log(paa));
-    pi_as(pi_as>100) = 100;
-    pi_as(pi_as<-100) = -100;
-    if sum(pi_as) == 0
-        pi_as = [0.5 0.5];
-    end
-    pi_as = pi_as./sum(pi_as);
-    pi_as = pi_as+0.01; pi_as = pi_as./sum(pi_as);
-    
-    
-    if exist('input') == 1   % if fitting, condition on data 
-        a(t) = input(1,t)+1; % 1 means nothing, 2 means lever press
-        x(t) = input(2,t)+1; % 1 means nothing, 2 means reward
-    else
-        % policy sampled stochastically
-        if rand < pi_as(1)
-            a(t) = 1;      % null
-        else
-            a(t) = 2;      % press lever
+    t = 2;
+    while t <= timeSteps
+        %% define features
+        na = sum(a(rt:t-1)==2); % number of actions since last reward
+        nt = t-rt;              % timesteps since last reward
+        
+        if nt>nS % a fix for conditions where the time / number of actions exceeds the number of features (rare)
+            nt = nS;
+        end
+        if na>nS
+            na = nS;
         end
         
-        % observe reward and new state
-        [x(t), sched] = habitWorld(t, a, x, sched);
-    end
-    
-    
-    %% policy complexity
-    paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;             % total marginal action distribution
-    paa = paa+0.01; paa = paa./sum(paa);
-   
-    if t>2
-        ps = (sum(results.ps,2)./sum(results.ps(:)));              % probability of being in a state
-    end
-    
-    % should encompass all states and actions (entire policy)
-    pas = exp(beta.*(theta(2:end,:))+log(paa));                    % entire state dep policy
-    pas = pas./sum(pas,2);
- 
-    mi = nansum(ps.*nansum(pas.*log(pas./paa),2));      % mutual information
- 
-    cost0 = log(pi_as./paa);
-    cost = cost0(a(t));                                 % policy cost for that state-action pair
-   
-    %% TD update
-    switch sched.model % different models with different costs
-        case 1 % no action cost, no complexity cost
-            r = deval(t)*double(x(t)==2);                % reward (deval is a flag for whether we are in deval mode)
-            rpe = r - rho + w'*(phi-phi0);               % TD error
-            rho =  rho + alpha_r *(r - rho);             % average reward update
-        case 2 % yes action cost, no complexity cost
-            r = deval(t)*double(x(t)==2)-acost*(a(t)==2);   
-            rpe = r - rho + w'*(phi-phi0);
-            rho =  rho + alpha_r *(r - rho);         
-        case 3  % yes action cost, yes complexity cost (fixed)
-            r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-            rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
-            rho =  rho + alpha_r *(r - rho);            
-        case 4  % yes action cost, yes complexity cost (adaptive)
-            r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-            % average reward update
-            if t>2*num    
-                dI = mean(results.mi(t-num)) - mean(results.mi(t-2*num:t-num)); % change in policy complexity
-                beta = beta + alpha_b*dI;
-                
-                % dV = mean(results.rho(t-num)) - mean(results.rho(t-2*num:t-num));
-                % beta = dI/dV;
-                
-                % bounds on beta
-                if beta<0
-                    disp('!')
-                    beta = 0.1;
-                end
-                
-                if beta > sched.cmax  %|| isnan(beta)
-                    beta = sched.cmax;
-                end
-                
+        if x(t-1)==2 % if you just saw reward, reinit state features (end of "episode")
+            phi0 = [Adt(:,1); Tdt(:,1)]; % features
+        else
+            phi0 = phi;
+        end
+        phi = [Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
+        phi(isnan(phi)) = 0;
+        
+        %% action history
+        if t>num
+            pa(1) = sum(a(t-num:t-1)==1)/num; pa(2) = sum(a(t-num:t-1)==2)/num; % trailing marginal action distribution
+        else
+            pa(1) = sum(a==1)/t; pa(2) = sum(a==2)/t;
+        end
+        pa = pa+0.01; pa = pa./sum(pa);
+        
+        %% action selection
+        act = theta'*phi+log(paa)';  % action probabilities
+        pi_as = [1/(1+exp(-(act(1)-act(2)))) 1-(1/(1+exp(-(act(1)-act(2)))))];
+        %pi_as = exp((theta'*phi)' + log(paa));
+        
+        %pi_as(pi_as>100) = 100;
+        %pi_as(pi_as<-100) = -100;
+        %if sum(pi_as) == 0
+        %    pi_as = [0.5 0.5];
+        %end
+        %pi_as = pi_as./sum(pi_as);
+        pi_as = pi_as+0.01; pi_as = pi_as./sum(pi_as);
+        
+        
+        if exist('input') == 1 && t<size(input(:,:,s),2)  % if fitting to data, condition on data
+            a(t) = input(1,t,s)+1; % 1 means nothing, 2 means lever press
+            x(t) = input(2,t,s)+1; % 1 means nothing, 2 means reward
+        else
+            % policy sampled stochastically
+            if rand < pi_as(1)
+                a(t) = 1;      % null
+            else
+                a(t) = 2;      % press lever
             end
             
-            rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
-            rho =  rho + alpha_r *(r - rho);
+            % observe reward and new state
+            [x(t), sched] = habitWorld(t, a, x, sched);
+            
+        end
+        
+        % reward counter
+         if x(t) == 2   % if you just saw reward
+            k = k+1;    % counter for # rewards
+            rt = t;     % log the timestep of last reward
+            RT(k) = rt; % counter for reward times
+         end
+        
+        %% policy complexity
+        if k > 1 % after 2 rewards, start using marginal, or else too much initial bias
+            paa(1) = sum(a==1)/t; paa(2) = sum(a==2)/t;                    % total marginal action distribution
+            paa = paa+0.01; paa = paa./sum(paa);
+        end
+        
+        if t>2
+            ps = (sum(results(s).ps,2)./sum(results(s).ps(:)));  % probability of being in a state
+        end
+        
+        % should encompass all states and actions (entire policy)
+        pas = exp(theta+log(paa));                                     % entire state dep policy
+        pas = pas./sum(pas,2);
+        
+        mi = nansum(ps.*nansum(pas.*log(pas./paa),2));                 % mutual information
+        
+        cost0 = log(pi_as./paa);
+        cost = cost0(a(t));                                            % policy cost for that state-action pair
+        
+        %% TD update
+        switch sched.model % different models with different costs
+            case 1 % no action cost, no complexity cost
+                r = deval(t)*double(x(t)==2);                % reward (deval is a flag for whether we are in deval mode)
+                rpe = r - rho + w'*(phi-phi0);               % TD error
+                rho =  rho + alpha_r *(r - rho);             % average reward update
+            case 2 % yes action cost, no complexity cost
+                r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
+                rpe = r - rho + w'*(phi-phi0);
+                rho =  rho + alpha_r *(r - rho);
+            case 3  % yes action cost, yes complexity cost (fixed)
+                r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
+                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
+                rho =  rho + alpha_r *(r - rho);
+            case 4  % yes action cost, yes complexity cost (adaptive)
+                r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
+                ecost0 = ecost;
+                ecost =  ecost  + 0.01*(cost - ecost);
+          
+                if k > 2 %&& x(t) == 2 && deval(t)==1
+                    % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
+                    % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
+                    dI = ecost - ecost0;
+                    %dI = mean(results(s).ecost(RT(k-1):RT(k))) - mean(results(s).ecost(RT(k-2):RT(k-1)));
+                    %V = results(s).rho(RT(k));
+                    beta = beta + alpha_b*(dI/rho);
+                    
+                    % dV = mean(results(s).r(RT(k-1):RT(k))) - mean(results(s).r(RT(k-2):RT(k-1)));
+                    % beta = dI/dV;
+                    
+                    % bounds on beta
+                    if beta < 0
+                        %disp('!')
+                        beta = 0.1;
+                    elseif beta > sched.cmax
+                        %disp('!')
+                        beta = sched.cmax;
+                    end
+                    
+                end
+                
+                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
+                rho =  rho + alpha_r *(r - rho);
+                
+                if x(t) == 2
+                    RPE.rew(t) = rpe;
+                    RPE.nonrew(t) = NaN;
+                    NA.rew(t) = na;
+                    NT.rew(t) = nt;
+                    NA.nonrew(t) = NaN;
+                    NT.nonrew(t) = NaN;
+                   
+          
+                else
+                    RPE.rew(t) = NaN;
+                    RPE.nonrew(t) = rpe;
+                    NA.rew(t) = NaN;
+                    NT.rew(t) = NaN;
+                    NA.nonrew(t) = na;
+                    NT.nonrew(t) = nt;
+                end
+                 VS(t) = w'*(phi-phi0);
+        end
+        
+        if isnan(rpe) || isinf(rpe)
+            keyboard
+        end
+        
+        %% value update
+        w0 = w;
+        w = w + alpha_w*rpe*phi0;                                 % weight update with value gradient
+        
+        if sum(isnan(w))>0
+            keyboard
+        end
+        
+        %% policy update
+        theta0 = theta;
+        theta(:,a(t)) = theta(:,a(t)) + alpha_t*rpe*phi0;         % policy weight update
+        
+        %% store results
+        results(s).a(t) = a(t);         % action
+        results(s).x(t) = x(t);         % observation
+        results(s).r(t) = r;            % instantaneous reward
+        results(s).rho(t) = rho;        % expected reward (avg reward)
+        results(s).rpe(t,:) = rpe;      % RPE
+        results(s).pi_as(t,:) = pi_as;  % chosen policy
+        
+        results(s).w(t,:) = w0;            % state value weights
+        results(s).theta(:,:,t) = theta0;  % policy weights
+        
+        results(s).cost(t) = cost;       % policy cost for the action taken C(p(a|s))
+        results(s).ecost(t) = ecost;     % expected cost (avg cost)
+        results(s).ps(:,t) = phi;        % state feature visits
+        results(s).pa(t,:) = pa;         % marginal action probability over 5 trials
+        results(s).paa(t,:) = paa;       % total marginal action probability (entire history)
+        results(s).mi(t) = mi;
+        results(s).beta(t) = beta;
+        results(s).dI(t) = dI;
+        %results(s).dV(t) = dV;
+        %results(s).V(t) = V;
+        
+        t = t+1;
+        if (isequal(sched.type,'FR') || isequal(sched.type,'VR')) && sum(x==2)==50 && sched.setrew == 1
+            sched.setrew = 0; % only do this once, make sure "setrew" is on in the big loop
+            timeSteps = t-1;
+            if ismember(s,sched.devalsess)          % if sess ends early, start devaluation
+                timeSteps = timeSteps+300;          % devaluation test period = 5 mins (300 timeSteps)
+                deval = ones(1,timeSteps);          % a vector indicating when devaluation "turns on"
+                deval(:,t:end) = 0;                 % 0 means devaluation mode
+            else
+                deval = ones(1,timeSteps);          % a vector indicating when devaluation "turns on"
+            end
+            
+        end
+        
+        
     end
-    
-    if isnan(rpe) || isinf(rpe)
-        keyboard
-    end
-    
-    %% value update
-    w0 = w;
-    w = w + alpha_w*rpe*phi0;                 % weight update
-    
-    if sum(isnan(w))>0
-        keyboard
-    end
-    
-    %% policy update
-    theta0 = theta;                              
-    theta(:,a(t)) = theta(:,a(t)) + alpha_t*rpe*phi;         % policy weight update
-  
-    %% store results
-    results.w(t,:) = w0;
-    results.theta(:,:,t) = theta0;
-    results.r(t) = r; % instantaneous reward
-    results.rho(t) = rho; % avg reward
-    results.rpe(t,:) = rpe; % RPE
-    results.v(t) = w'*phi; % estimated value
-    results.cost(t,:) = cost;
-    results.cost0(t,:) = sum(cost0);
-    results.ps(:,t) = phi(2:end,:);
-    results.pa(t,:) = pa;
-    results.paa(t,:) = paa;
-    results.mi(t) = mi;
-    results.beta(t) = beta;
-    results.rt(k) = rt;
-    results.dI(t) = dI;
-    results.dV(t) = dV;
-    %results.cont(t) = pR(t); % contingency
-    
-    results.pi_as(t,:) = pi_as;
-    results.a(t) = a(t);
-    results.x(t) = x(t);
-    
+    results(s).deval = deval;
+    results(s).NA = NA;
+    results(s).NT = NT;
+    results(s).RPE = RPE;
+    results(s).VS = VS;
+    %figure; subplot 121; plot(results(sess).dI); hold on; plot(results(sess).V); plot(results.beta)
+    %subplot 122; plot(results(sess).dI); hold on; plot(results(sess).dV); plot(results.beta1)
 end
+
+% check expected cost
+figure; plot(results.ecost); hold on; plot(results.cost);
+figure; plot(results.dI,'k'); hold on; plot(results.rho,'r');
 end
 
 

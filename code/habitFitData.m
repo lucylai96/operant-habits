@@ -40,7 +40,7 @@ figure(1); hold on; xlabel('time(s)'); ylabel('action [0,1]');subprettyplot(3,1)
 figure(2); hold on; xlabel('time(s)'); ylabel('action rate (presses/sec)');subprettyplot(3,1)
 legend([type],'FontSize',15); legend('boxoff')
 
-for typ = 1:length(type) % loop through each schedule separately
+for typ = 2:length(type) % loop through each schedule separately
     for ses = 1:3 % loop through each session separately
         sched.type = type{typ};
         sched.timeSteps = timeSteps(typ,ses);
@@ -80,7 +80,7 @@ for typ = 1:length(type) % loop through each schedule separately
                 x0 = [0.03+rand*0.1  0.03+rand*0.1 0.03+rand*0.1  1+rand*0.1  0.03+rand*0.1];
                 % x0 = [0.1 0.2 0.1 3 0.2]; % debugging
                 % x0 = [0.1158   0.8807   0.0154   1.8724   0.4138];
-                [params(fit_i,:),error(fit_i)] = bads(@model,x0,[0.01 0.01 0.01 0.01 0.01],[.99 .99 .99 15 0.99],[0.01 0.01 0.01 0.01 0.01],[.8 .8 .8 3 .8],[],[],input);
+                [params(fit_i,:),error(fit_i)] = bads(@model,x0,[0.01 0.01 0.01 0.01 0.01],[.99 .99 .99 20 0.99],[0.01 0.01 0.01 0.01 0.01],[.8 .8 .8 10 .8],[],[],input);
             end
             
             %% fitting the beta learning rate
@@ -111,7 +111,7 @@ sched = input.sched;
 
 %% initialize
 agent.alpha_w = params(1);
-agent.alpha_t = params(2);
+agent.alpha_t = params(2);  
 agent.alpha_r = params(3);  % only relevant for model 3 and 4
 agent.alpha_b = 0;          % only relevant for model 4
 sched.beta = params(4);     % only relevant for model 3 and 4
@@ -142,7 +142,7 @@ n = ones(1,length(Y));
 nLL = -sum(Y.*log(p) + (n-Y).*log(1-p));
 
 %% sanity checks
-% figure; hold on;plot(1:sched.timeSteps,p'); x = ones(1,sched.timeSteps); A = binornd(repmat(x,[100,1]),repmat(p,[100,1])); figure; hold on;subplot 311; hold on;shadedErrorBar(1:sched.timeSteps,movmean(mean(A),200),movmean(std(A),200));plot(movmean(Y,200)); title('actions');prettyplot; subplot 313;hold on; plot(results(1).x,'LineWidth',3);plot(input.data(2,:),'LineWidth',3); title('rewards');prettyplot;subplot 312;hold on; plot(results(1).a,'LineWidth',3);plot(input.data(1,:),'LineWidth',3); title('actions');prettyplot; % were rewards delivered at the same time?
+% figure; hold on;plot(1:sched.timeSteps,p'); x = ones(1,sched.timeSteps); A = binornd(repmat(x,[100,1]),repmat(p,[100,1])); figure; hold on;subplot 311; hold on;shadedErrorBar(1:sched.timeSteps,mean(movmean(A',200)'),std(movmean(A',200)'));plot(movmean(Y,200));plot(movmean(Y,200)); title('actions');prettyplot; subplot 313;hold on; plot(results(1).x,'LineWidth',3);plot(input.data(2,:),'LineWidth',3); title('rewards');prettyplot;subplot 312;hold on; plot(results(1).a,'LineWidth',3);plot(input.data(1,:),'LineWidth',3); title('actions');prettyplot; % were rewards delivered at the same time?
 
 
 end

@@ -20,6 +20,7 @@ function habitCleanData
 
 % VI45(1).session(1).test_lever_rates; % mean lever presses per min
 
+
 % to convert from mins to deciseconds:
 % 5 mins * 600 decisecs per min = 300 "timesteps"
 % 27361 decisecs / 600 decisecs per min ~= 45 mins = 2736 seconds
@@ -27,6 +28,137 @@ function habitCleanData
 clear all
 close all
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools/bads-master')
+habitColors;
+
+examp = 0; % loading example rat or whole dataset?
+run = 1;
+
+if examp == 1 && run == 1
+    example
+elseif run ==1
+    whole_dataset
+end
+
+end
+
+function whole_dataset
+
+%% unpack data
+load('complete_data (2).mat')
+
+% assign diff variables to diff structures
+FR20 = schedule.FR;
+VR20 = schedule.RR;
+FI45 = schedule.FI;
+VI45 = schedule.RI;
+numsess = 20;
+numrats = 8;
+
+for r = 1:numrats
+    for i = 1:numsess % for all sessions, convert timestamps to secs
+        FR20.training.session(i).lever_time_stamps{r}(FR20.training.session(i).lever_time_stamps{r}==0)=[];
+        FR20.training.session(i).lever_time_stamps{r} = ceil(FR20.training.session(i).lever_time_stamps{r}./100); % centisecs --> millisecond
+        FR20.training.session(i).reward_time_stamps{r}(FR20.training.session(i).reward_time_stamps{r}==0) =[];
+        FR20.training.session(i).reward_time_stamps{r} = ceil(FR20.training.session(i).reward_time_stamps{r}./100);
+        FR20.session(i).more2taps{r} = size(find(diff(FR20.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        FR20.training.session(i).lever_time_stamps{r} = unique(FR20.training.session(i).lever_time_stamps{r});
+
+        VR20.training.session(i).lever_time_stamps{r}(VR20.training.session(i).lever_time_stamps{r}==0)=[];
+        VR20.training.session(i).lever_time_stamps{r} = ceil(VR20.training.session(i).lever_time_stamps{r}./100); % centisecs --> millisecond
+        VR20.training.session(i).reward_time_stamps{r}(VR20.training.session(i).reward_time_stamps{r}==0) =[];
+        VR20.training.session(i).reward_time_stamps{r} = ceil(VR20.training.session(i).reward_time_stamps{r}./100);
+        VR20.session(i).more2taps{r} = size(find(diff(VR20.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        VR20.training.session(i).lever_time_stamps{r} = unique(VR20.training.session(i).lever_time_stamps{r});
+
+        FI45.training.session(i).lever_time_stamps{r}(FI45.training.session(i).lever_time_stamps{r}==0)=[];
+        FI45.training.session(i).lever_time_stamps{r} = ceil(FI45.training.session(i).lever_time_stamps{r}./100); % centisecs --> millisecond
+        FI45.training.session(i).reward_time_stamps{r}(FI45.training.session(i).reward_time_stamps{r}==0) =[];
+        FI45.training.session(i).reward_time_stamps{r} = ceil(FI45.training.session(i).reward_time_stamps{r}./100);
+        FI45.session(i).more2taps{r} = size(find(diff(FI45.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        FI45.training.session(i).lever_time_stamps{r} = unique(FI45.training.session(i).lever_time_stamps{r});
+        
+        VI45.training.session(i).lever_time_stamps{r}(VI45.training.session(i).lever_time_stamps{r}==0) =[];
+        VI45.training.session(i).lever_time_stamps{r} = ceil(VI45.training.session(i).lever_time_stamps{r}./100); % centisecs --> decisecond
+        VI45.training.session(i).reward_time_stamps{r}(VI45.training.session(i).reward_time_stamps{r}==0) =[];
+        VI45.training.session(i).reward_time_stamps{r} = ceil(VI45.training.session(i).reward_time_stamps{r}./100);
+        VI45.session(i).more2taps{r} = size(find(diff(VI45.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        VI45.training.session(i).lever_time_stamps{r} = unique(VI45.training.session(i).lever_time_stamps{r});
+        
+    end
+end
+
+%% reorganize data into: [0 1] depending on if reward was observed
+for r = 1:numrats
+    for i = 1:numsess % for all sessions, convert timestamps to secs
+        
+        FR20n(r).session(i).training.lever_binned = zeros(1,max(FR20.training.session(i).lever_time_stamps{r}));
+        FR20n(r).session(i).training.lever_binned(FR20.training.session(i).lever_time_stamps{r}) = 1;
+        FR20n(r).session(i).training.reward_binned = zeros(1,max(FR20.training.session(i).reward_time_stamps{r}));
+        FR20n(r).session(i).training.reward_binned(FR20.training.session(i).reward_time_stamps{r}) = 1;
+        FR20n(r).timeSteps(i) = max(FR20.training.session(i).lever_time_stamps{r});
+        
+        VR20n(r).session(i).training.lever_binned = zeros(1,max(VR20.training.session(i).lever_time_stamps{r}));
+        VR20n(r).session(i).training.lever_binned(VR20.training.session(i).lever_time_stamps{r}) = 1;
+        VR20n(r).session(i).training.reward_binned = zeros(1,max(VR20.training.session(i).reward_time_stamps{r}));
+        VR20n(r).session(i).training.reward_binned(VR20.training.session(i).reward_time_stamps{r}) = 1;
+        VR20n(r).timeSteps(i) = max(VR20.training.session(i).lever_time_stamps{r});
+        
+        FI45n(r).session(i).training.lever_binned = zeros(1, 2290);
+        FI45n(r).session(i).training.lever_binned(FI45.training.session(i).lever_time_stamps{r}) = 1;
+        FI45n(r).session(i).training.reward_binned = zeros(1, 2290);
+        FI45n(r).session(i).training.reward_binned(FI45.training.session(i).reward_time_stamps{r}) = 1;
+        FI45n(r).timeSteps(i) = 2290;
+        
+        VI45n(r).session(i).training.lever_binned = zeros(1, 2290);
+        VI45n(r).session(i).training.lever_binned(VI45.training.session(i).lever_time_stamps{r})= 1;
+        VI45n(r).session(i).training.reward_binned = zeros(1, 2290);
+        VI45n(r).session(i).training.reward_binned(VI45.training.session(i).reward_time_stamps{r})= 1;
+        VI45n(r).timeSteps(i) = 2290;
+        VI45n(r).times = [diff([1; VI45.training.session(i).reward_time_stamps{r}])];
+        
+        FR.actRate(r,i) = sum(FR20n(r).session(i).training.lever_binned)./FR20n(r).timeSteps(i);
+        VR.actRate(r,i) = sum(VR20n(r).session(i).training.lever_binned)./VR20n(r).timeSteps(i);
+        FI.actRate(r,i) = sum(FI45n(r).session(i).training.lever_binned)./FI45n(r).timeSteps(i);
+        VI.actRate(r,i) = sum(VI45n(r).session(i).training.lever_binned)./VI45n(r).timeSteps(i);
+        
+    end
+end
+% timeSteps (unrolled)
+% timeSteps = [FR20.timeSteps(1) FR20.timeSteps(2) FR20.timeSteps(3);
+%     VR20.timeSteps(1) VR20.timeSteps(2) VR20.timeSteps(3);
+%     FI45.timeSteps(1) FI45.timeSteps(2) FI45.timeSteps(3);
+%     VI45.timeSteps(1) VI45.timeSteps(2) VI45.timeSteps(3)];
+for d = 1:3 % 3 deval sessions
+    FR.test(:,:,d) = [FR20.test.cycle(d).lever_presses.valued FR20.test.cycle(d).lever_presses.devalued];
+    VR.test(:,:,d) = [VR20.test.cycle(d).lever_presses.valued VR20.test.cycle(d).lever_presses.devalued];
+
+    FI.test(:,:,d) = [FI45.test.cycle(d).lever_presses.valued FI45.test.cycle(d).lever_presses.devalued];
+    VI.test(:,:,d) = [VI45.test.cycle(d).lever_presses.valued VI45.test.cycle(d).lever_presses.devalued];
+end
+FR20 = FR;
+VR20 = VR;
+FI45 = FI;
+VI45 = VI;
+save('all_data_cleaned.mat','FI45','VI45','FI45n','VI45n','FR20','VR20','FR20n','VR20n')
+
+timeSteps = [FI45(r).timeSteps(1) FI45.timeSteps(2) FI45.timeSteps(3);
+    VI45.timeSteps(1) VI45.timeSteps(2) VI45.timeSteps(3)];
+
+% mean lever presses per min (unrolled)
+test_lever_rates.valued = [FI45.session(1).test_lever_rates.valued FI45.session(2).test_lever_rates.valued FI45.session(3).test_lever_rates.valued;
+    VI45.session(1).test_lever_rates.valued VI45.session(2).test_lever_rates.valued VI45.session(3).test_lever_rates.valued];
+test_lever_rates.devalued = [FR20.session(1).test_lever_rates.devalued FR20.session(2).test_lever_rates.devalued FR20.session(3).test_lever_rates.devalued;
+    VR20.session(1).test_lever_rates.devalued VR20.session(2).test_lever_rates.devalued VR20.session(3).test_lever_rates.devalued;
+    FI45.session(1).test_lever_rates.devalued FI45.session(2).test_lever_rates.devalued FI45.session(3).test_lever_rates.devalued;
+    VI45.session(1).test_lever_rates.devalued VI45.session(2).test_lever_rates.devalued VI45.session(3).test_lever_rates.devalued];
+
+
+save('all_data_cleaned.mat','FI45','VI45','timeSteps','test_lever_rates'); % save
+
+
+end
+
+function example
 
 %% unpack data
 load('example_rats.mat')

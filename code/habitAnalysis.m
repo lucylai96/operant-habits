@@ -2,6 +2,8 @@ function habitAnalysis(fig)
 % PURPOSE: reproducing major habit findings
 % Written by Lucy Lai
 
+close all 
+
 % plot settings
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools'); % various plotting tools
 addpath('./params'); % parameters
@@ -19,7 +21,73 @@ sched.beta = 1;     % starting beta; high beta = low cost. beta should increase 
 %sched.cmax = 0.5;     % max complexity (low v high)
 
 switch fig
-    
+    case 0 % basic data analysis
+        
+        % Garr et. al. data
+        load('all_data_cleaned.mat')
+        
+        %% ratio plots
+        FR20.test = FR20.test./60;
+        VR20.test = VR20.test./60;
+        figure; hold on;
+        h(1,:) = errorbar(mean(FR20.actRate),sem(FR20.actRate,1),'LineWidth',2,'Color',map(1,:)); %plot(mean(FR20.actRate));
+        h(2,:) = errorbar(mean(VR20.actRate),sem(VR20.actRate,1),'LineWidth',2,'Color',map(2,:)); %plot(mean(VR20.actRate));
+       
+        %% interval plots
+        FI45.test = FI45.test./60;
+        VI45.test = VI45.test./60;
+        h(3,:) = errorbar(mean(FI45.actRate),sem(FI45.actRate,1),'LineWidth',2,'Color',map(3,:)); %plot(mean(FI45.actRate));
+        h(4,:) = errorbar(mean(VI45.actRate),sem(VI45.actRate,1),'LineWidth',2,'Color',map(4,:)); %plot(mean(VI45.actRate));
+        plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--') %
+        legend(h,'FR20','VR20','FI45','VI45','deval'); legend('boxoff'); 
+        ylabel('lever presses/sec'); xlabel('sessions'); prettyplot;
+  
+        
+        % deval
+        figure; hold on;
+        for d = 1:3
+            subplot 221; hold on;
+            [b e] = barwitherr(sem(FR20.test(:,:,d),1),d, mean(FR20.test(:,:,d)),'FaceColor',map(1,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(1,:);
+            b(2).LineWidth = 2;
+            e.Color = map(1,:);
+            e.LineWidth = 2;
+            title('FR20')
+            
+            subplot 222; hold on;
+            [b e] = barwitherr(sem(VR20.test(:,:,d),1),d, mean(VR20.test(:,:,d)),'FaceColor',map(2,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(2,:);
+            b(2).LineWidth = 2;
+            e.Color = map(2,:);
+            e.LineWidth = 2;
+            title('VR20')
+            
+            subplot 223; hold on;
+            [b e] = barwitherr(sem(FI45.test(:,:,d),1),d, mean(FI45.test(:,:,d)),'FaceColor',map(3,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(3,:);
+            b(2).LineWidth = 2;
+            e.Color = map(3,:);
+            e.LineWidth = 2;
+            
+            title('FI45')
+            subplot 224; hold on;
+            [b e] = barwitherr(sem(VI45.test(:,:,d),1),d, mean(VI45.test(:,:,d)),'FaceColor',map(4,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(4,:);
+            b(2).LineWidth = 2;
+            e.Color = map(4,:);
+            e.LineWidth = 2;
+            title('VI45')
+        end
+        subplot 221; hold on;
+        ylabel('lever presses/sec'); xlabel('deval session #');
+        legend('valued','devalued'); legend('boxoff'); 
+        equalabscissa(2,2)
+        subprettyplot(2,2)
+        why
     case 1
         agent.alpha_w = 0.1;
         agent.alpha_t = 0.1;
@@ -159,7 +227,7 @@ switch fig
         type = {'FR' 'VR' 'FI' 'VI'};
         load('example_rats_cleaned.mat'); % load data
         
-        sched.model = 3; 
+        sched.model = 3;
         sched.R = 20; % in deciseconds (VR/FR20*10 = 200)
         sched.I = 45; % in deciseconds  (VI/FI45*10 = 450)
         sp = 1;
@@ -169,7 +237,7 @@ switch fig
                 sched.timeSteps = timeSteps(typ,ses);
                 load(strcat(sched.type,'_params_s',num2str(ses),'.mat')); % get params and error
                 %params = [0.0151    0.0122    0.7151    0.0702    2.1222];
-                %params = mean(params);
+                params = median(params);
                 
                 %% for FR only
                 if sched.type == 'FR'
@@ -301,12 +369,12 @@ timeSteps = length(data.lever);
 % h(1,:) = plot(cs,'Color',map(1,:),'LineWidth',2);
 % xplot = find(data.reward(end-num:end)==1);
 % line([xplot' xplot'+10]',[cs(xplot)' cs(xplot)']','LineWidth',2,'Color','k');
-% 
+%
 % cs = cumsum(model.a(timeSteps-num:timeSteps)-1);
 % h(2,:) = plot(cs,'Color',map(2,:),'LineWidth',2);
 % xplot = find(model.x(timeSteps-num:timeSteps)==2);
 % line([xplot' xplot'+10]',[cs(xplot)' cs(xplot)']','LineWidth',2,'Color','k');
-% 
+%
 % legend(h,{'data','model'});
 % legend('boxoff')
 % xlabel('time')
@@ -323,15 +391,11 @@ for i = 1:length(type)
     movOutRate = movmean(data.reward, win,'Endpoints','shrink');
     movActRate = movmean(data.lever, win,'Endpoints','shrink');
     
-    
 end
 
 figure; hold on;
 subplot(2,4,1:3); hold on;
-%for i = 1:length(type)
 plot(movOutRate,'LineWidth',1.5)
-%end
-%plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
 prettyplot
 ylabel('outcome rate')
 legend([type 'devaluation'],'FontSize',15); legend('boxoff')
@@ -359,7 +423,6 @@ set(gca,'xtick',[1:2],'xticklabel',type)
 prettyplot
 
 
-
 for i = 1:length(type)
     outRate = mean(cat(1,model.outRate));
     actRate = mean(cat(1,model.actRate));
@@ -371,27 +434,21 @@ for i = 1:length(type)
 end
 
 subplot(2,4,1:3); hold on;
-%for i = 1:length(type)
-plot(movOutRate,'LineWidth',1.5)
-%end
+shadedErrorBar(1:size(model(1).movActRate,2),mean(cat(1,model.movOutRate)),sem(cat(1,model.movOutRate),1),{'LineWidth',1.5,'Color',map(2,:)},1)
 plot([timeSteps timeSteps],ylim,'k--','LineWidth',2)
 prettyplot
 ylabel('outcome rate')
 legend([type 'devaluation'],'FontSize',15); legend('boxoff')
 
 subplot(2,4,5:7); hold on;
-for i = 1:length(type)
-    plot(movActRate,'LineWidth',1.5)
-end
+shadedErrorBar(1:size(model(1).movActRate,2),mean(cat(1,model.movActRate)),sem(cat(1,model.movActRate),1),{'LineWidth',1.5,'Color',map(2,:)},1)
 plot([timeSteps timeSteps],ylim,'k--','LineWidth',2)
 xlabel('time (s)')
 ylabel('action rate')
 prettyplot
 
 subplot(2,4,4); hold on;
-
 bar(2,outRate);
-
 legend('data','model'); legend('boxoff')
 set(gca,'xtick',[1:2],'xticklabel',type)
 prettyplot
@@ -403,7 +460,7 @@ set(gcf, 'Position',  [300, 300, 800, 500])
 
 %%
 
-% 
+%
 % figure; hold on;
 % subplot 311; hold on;
 % for i = 1:length(type)
@@ -412,26 +469,26 @@ set(gcf, 'Position',  [300, 300, 800, 500])
 % plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
 % ylabel(' \beta')
 % legend([type 'devaluation'],'FontSize',15); legend('boxoff')
-% 
+%
 % subplot 312; hold on;
 % for i = 1:length(type)
 %     plot(movmean(model.cost,500,'Endpoints','shrink'),'LineWidth',1.5)
 % end
 % plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
 % ylabel('policy cost C(\pi_\theta)')
-% 
+%
 % subplot 313; hold on;
 % for i = 1:length(type)
 %     plot(movmean((1./model.beta).* model.cost', win,'Endpoints','shrink'),'LineWidth',1.5)
 % end
 % plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
 % ylabel('\beta^{-1} C(\pi_\theta)')
-% 
+%
 % subprettyplot(3,1)
-% 
+%
 % set(gcf, 'Position',  [300, 300, 700, 500])
-% 
-% 
+%
+%
 % %% action rate before and after devaluation
 % if sched.devalTime ~= timeSteps
 %     devalWin = timeSteps-sched.devalTime;

@@ -1,13 +1,13 @@
-function [x,sched] = habitWorld(t, A, X, sched)
+function [x,sched] = habitWorld(t, a, x, sched)
 % takes in state and action, outputs observation x
 % for 4 different schedules: FI, FR, VI, VR
 
 % INPUT:  sched.type -  FR, FI, VR, VI
 %         sched.R - ratio arming parameter
 %         sched.I - interval arming parameter
-%         X - history of observations
+%         x - history of observations
 %         t - current time
-%         A - [1 x T] action history vector
+%         a - [1 x T] action history vector
 
 % OUTPUT: x - observation: {1: nothing, 2: reward}
 
@@ -16,7 +16,7 @@ switch sched.type
     case 'FR'
         R = sched.R;
         % after R actions, I get a reward
-        if sum(A(find(X(1:t-1)==2,1,'last'):t)-1) > R
+        if sum(a(find(x(1:t-1)==2,1,'last'):t)-1) > R
             x = 2; % observe reward
         else
             x = 1;
@@ -26,7 +26,7 @@ switch sched.type
     case 'FI'
         
         I = sched.I;
-        if length(X(find(X(1:t-1)==2,1,'last'):t-1)) >= I && A(t) == 2 % if you waited more than the interval
+        if length(x(find(x(1:t-1)==2,1,'last'):t-1)) >= I && a(t) == 2 % if you waited more than the interval
             x = 2; % observe reward
         else
             x = 1;
@@ -39,7 +39,7 @@ switch sched.type
         %if k > length(sched.actions)
         %    sched.actions = [sched.actions sched.actions];
         %end
-        if sum(A(find(X(1:t-1)==2,1,'last'):t)-1) > sched.actions(k)
+        if sum(a(find(x(1:t-1)==2,1,'last'):t)-1) > sched.actions(k)
             x = 2; % observe reward
             sched.k = sched.k+1;
         else
@@ -59,7 +59,7 @@ switch sched.type
         %if k > length(sched.times)
         %    sched.times = [sched.times sched.times];
         %end
-        if length(X(find(X(1:t-1)==2,1,'last'):t-1)) >= sched.times(k) && A(t) == 2
+        if length(x(find(x(1:t-1)==2,1,'last'):t-1)) >= sched.times(k) && a(t) == 2
             x = 2; % observe reward
             sched.k = sched.k+1;
         else
