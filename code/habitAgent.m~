@@ -184,31 +184,48 @@ for s = 1:sched.sessnum
         switch sched.model % different models with different costs
             case 1 % no action cost, no complexity cost
                 r = deval(t)*double(x(t)==2);                % reward (deval is a flag for whether we are in deval mode)
-                rpe = r - rho + w'*(phi-phi0);               % TD error
                 rho =  rho + alpha_r *(r - rho);             % average reward update
+                rpe = r - rho + w'*(phi-phi0);               % TD error
             case 2 % yes action cost, no complexity cost
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                rpe = r - rho + w'*(phi-phi0);
                 rho =  rho + alpha_r *(r - rho);
+                rpe = r - rho + w'*(phi-phi0);
             case 3  % yes action cost, yes complexity cost (fixed)
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
                 rho =  rho + alpha_r *(r - rho);
+                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
             case 4  % yes action cost, yes complexity cost (adaptive)
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
                 ecost0 = ecost;
-                ecost =  ecost  + alpha_r *(cost - ecost);
-          
-                if k > 2 %&& x(t) == 2 && deval(t)==1
+                ecost =  ecost + alpha_r * (cost - ecost);
+                rho0 = rho;
+                rho =  rho + alpha_r * (r - rho);
+                
+                if k > 2 && x(t) == 2 && deval(t)==1
                     % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
-                    % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
-                    dI = ecost - ecost0;
-                    %dI = mean(results(s).ecost(RT(k-1):RT(k))) - mean(results(s).ecost(RT(k-2):RT(k-1)));
-                    %V = results(s).rho(RT(k));
-                    beta = beta + alpha_b*(dI/rho);
+                    %dI = mean(results(s).ecost(RT(k-1):RT(k)-1)) - mean(results(s).ecost(RT(k-2):RT(k-1)));
                     
-                    % dV = mean(results(s).r(RT(k-1):RT(k))) - mean(results(s).r(RT(k-2):RT(k-1)));
-                    % beta = dI/dV;
+                    % every trial, but doesn't work
+                    % dI = ecost-ecost0;
+                    % beta = beta + alpha_b*(dI/rho);
+                    
+                    % only at reward points -- fluctuates a lot but correct trend
+                    %dI = 
+                    %V = mean([results(s).r(RT(k-1):t-1) r]);
+                    %beta = beta + alpha_b*(dI/V);
+                  
+                    % only at reward points 
+                    dI = mean([results.cost(RT(k-1)+1:t-1) cost]) - mean(results.cost(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
+                    %dV = mean([results.r(RT(k-1)+1:t-1) r]) - mean(results.r(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
+                    %dI = ecost - results.ecost(RT(k-1));
+                    %V = mean([results(s).r(RT(k-1)+1:t-1) r]); % vs rho
+                    %dV = results(s).rho-
+                    beta = beta + alpha_b*dI; % problem bc rho is almost always 0, absorb it into the learning rate
+                   
+                    % every timestep?
+                    %dI = ecost-ecost0;
+                    %dV = rho-rho0;
+                    %beta = beta + alpha_b*(beta - dI/dV);
                     
                     % bounds on beta
                     if beta < 0
@@ -221,10 +238,10 @@ for s = 1:sched.sessnum
                     
                 end
                 
-                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
-                rho =  rho + alpha_r *(r - rho);
-                
-                if x(t) == 2
+                rpe = r - rho + w'*(phi-phi0)-(1/beta)*ecost;
+        end
+        
+                   if x(t) == 2
                     RPE.rew(t) = rpe;
                     RPE.nonrew(t) = NaN;
                     NA.rew(t) = na;
@@ -242,17 +259,14 @@ for s = 1:sched.sessnum
                     NT.nonrew(t) = nt;
                 end
                  VS(t) = w'*(phi-phi0);
-        end
         
         if isnan(rpe) || isinf(rpe)
             keyboard
         end
         
         %% value update
-        phi_sa = [phi phi];
-        phi_s = sum(phi_sa.*pi_as,2);
         w0 = w;
-        w = w + alpha_w*rpe*phi_s;                                 % weight update with value gradient
+        w = w + alpha_w*rpe*phi0;                                 % weight update with value gradient
         
         if sum(isnan(w))>0
             keyboard
@@ -260,7 +274,7 @@ for s = 1:sched.sessnum
         
         %% policy update
         theta0 = theta;
-        theta(:,a(t)) = theta(:,a(t)) + alpha_t*rpe*(phi_sa-phi_s);         % policy weight update
+        theta(:,a(t)) = theta(:,a(t)) + alpha_t*rpe*phi0;         % policy weight update
         
         %% store results
         results(s).a(t) = a(t);         % action
@@ -310,8 +324,10 @@ for s = 1:sched.sessnum
 end
 
 % check expected cost
-figure; plot(results.ecost); hold on; plot(results.cost);
+figure; hold on; plot(results.cost);plot(results.ecost,'k'); 
 figure; plot(results.dI,'k'); hold on; plot(results.rho,'r');
+figure; plot(results.beta)
+
 end
 
 

@@ -25,11 +25,11 @@ addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                 
 
 % params: [R  I  model timeSteps  beta  cmax  deval]
 if nargin <1
-    params =  [20 45 4 3000 10 100 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr
-    aparams = [0.1 0.1 0.1 0.1 0.05];
+    params =  [20 45 4 5000 1 100 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr
+    aparams = [0.1 0.1 0.01 0.01 0.05];
     % aparams = [1 1 1 1 1];
     type = {'VR','VI'};
-    %type = {'FR','VR','FI','VI'};
+    type = {'FR','VR','FI','VI'};
     % type = 'VI';
 end
 
@@ -439,7 +439,7 @@ end
 end
 
 function makePlots(results, sched, type)
-
+diagn == 1
 %% init color map
 map = brewermap(4,'*RdBu');
 temp = map(3,:);
@@ -502,7 +502,7 @@ end
 %% probability of action (actual policy)
 for i = 1:length(type)
     ps = (sum(results(i).ps,2)./sum(results(i).ps(:)));
-    results(i).PAS = exp(results(i).beta(end)*results(i).theta(:,:,end) + log(results(i).paa(end,:)));
+    results(i).PAS = exp(results(i).theta(:,:,end) + log(results(i).paa(end,:)));
     results(i).PAS = results(i).PAS./sum(results(i).PAS,2);
     
     results(i).MI = sum(results(i).PAS.*log(results(i).PAS./results(i).paa(end,:)),2);
@@ -520,7 +520,7 @@ if length(type)==4 % if doing all 4 schedules at once
     imagesc([results(3).PAS(:,2) results(4).PAS(:,2)])
     set(gca,'xtick',[1:2],'xticklabel',type([3 4]))
     subprettyplot(1,2)
-    suptitle('p(a|s) = exp[\beta*\theta + log P(a)]')
+    suptitle('p(a|s) = exp[\theta + log P(a)]')
 else
     figure; hold on;
     for i = 1:length(type)
@@ -531,7 +531,7 @@ else
         ylabel('state feature');
         prettyplot
     end
-    suptitle('p(a|s) = exp[\beta*\theta + log P(a)]')
+    suptitle('p(a|s) = exp[\theta + log P(a)]')
 end
 
 %% visualize weights
@@ -609,17 +609,19 @@ set(gcf, 'Position',  [300, 300, 800, 500])
 
 
 %% diagnostics
-for i = 1:length(type)
-    figure; subplot 221; histogram(results(i).NA.rew,50); ylabel('rew'); title('# actions');subplot 222; histogram(results(i).NT.rew,50);title('# seconds');
-    subplot 223; histogram(results(i).NA.nonrew,50); ylabel('nonrew');subplot 224; histogram(results(i).NT.nonrew,50);  subprettyplot(2,2)
-    suptitle(type{i})
-    % how is theta being updated? plot rpe vs rewarded and non rewarded nt
-    figure; subplot 221;hold on;plot(results(i).NT.nonrew,results(i).RPE.nonrew,'r.');plot(results(i).NT.rew,results(i).RPE.rew,'g.');title('seconds');
-    subplot 222;hold on;plot(results(i).NA.nonrew,results(i).RPE.nonrew,'r.');plot(results(i).NA.rew,results(i).RPE.rew,'g.');title('actions');
-    subplot 223;hold on;plot(results(i).VS,results(i).RPE.nonrew,'r.');plot(results(i).VS,results(i).RPE.rew,'g.');title('V(s`)-V(s)');
-    subplot 224;hold on;plot(-(1./results(i).beta).*results(i).cost,results(i).RPE.nonrew,'r.');plot(-(1./results(i).beta).*results(i).cost,results(i).RPE.rew,'g.');title('1/beta');
-    subprettyplot(2,2)% look at theta at time t and theta at time t-1
-    
+if diagn ==1
+    for i = 1:length(type)
+        figure; subplot 421; histogram(results(i).NA.rew,50); ylabel('rew'); title('# actions');subplot 422; histogram(results(i).NT.rew,50);title('# seconds');
+        subplot 423; histogram(results(i).NA.nonrew,50); ylabel('nonrew'); subplot 424; histogram(results(i).NT.nonrew,50);
+        % how is theta being updated? plot rpe vs rewarded and non rewarded nt
+        subplot 425; hold on; plot(results(i).NA.nonrew,results(i).RPE.nonrew,'r.'); plot(results(i).NA.rew,results(i).RPE.rew,'g.'); ylabel('RPE \delta')
+        subplot 426; hold on; plot(results(i).NT.nonrew,results(i).RPE.nonrew,'r.'); plot(results(i).NT.rew,results(i).RPE.rew,'g.');
+        subplot 427; hold on; plot(results(i).VS,results(i).RPE.nonrew,'r.'); plot(results(i).VS,results(i).RPE.rew,'g.');title('V(s`)-V(s)');
+        subplot 428; hold on; plot((1./results(i).beta).*results(i).cost,results(i).RPE.nonrew,'r.'); plot((1./results(i).beta).*results(i).cost,results(i).RPE.rew,'g.'); title('\beta^{-1} C(\pi)');
+        subprettyplot(4,2)
+        suptitle(type{i})
+        
+    end
 end
 
 

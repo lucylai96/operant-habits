@@ -45,14 +45,14 @@ mu_d = 1:nS;    % mean of features
 wa = 0.1;       % weber fraction for actions
 wt = 0.1;      % weber fraction for time
 t = 1:nS;       % time or actions
-%c = linspace(0,1,nS);
-%mu_c = linspace(0,1,nS);
-%wc = 0.01;
-%Cdt = zeros(nS, size(linspace(0,1,nS),2)); % d dimensions
+% c = linspace(0,1,nS);
+% mu_c = linspace(0,1,nS);
+% wc = 0.01;
+% Cdt = zeros(nS, size(linspace(0,1,nS),2)); % d dimensions
 for i = 1:length(d)
     Adt(i,:) = exp((-1/2)*((t-mu_d(i))/(wa*mu_d(i))).^2);
     Tdt(i,:) = exp((-1/2)*((t-mu_d(i))/(wt*mu_d(i))).^2);
-    %Cdt(i,:) = exp((-1/2)*((c-mu_c(i))/(wc)).^2);
+    % Cdt(i,:) = exp((-1/2)*((c-mu_c(i))/(wc)).^2);
 end
 
 
@@ -67,10 +67,10 @@ end
 % weights
 phi = [Adt(:,1); Tdt(:,1)];     % features
 theta  = zeros(length(phi),2);  % policy weights
-%theta(:,1) = 1;                % bias to not do anything
-%theta(:,2) = -1;               % bias to not do anything
+theta(:,1) = 0.4;              % bias to not do anything
+theta(:,2) = -0.4;              % bias to not do anything
 w = zeros(length(phi),1);       % value weights
-num = 5;                        % marginal action probability over the last num seconds
+num = 10;                       % marginal action probability over the last num seconds
 
 for s = 1:sched.sessnum
     % at start of every session reset these initial values
@@ -82,6 +82,7 @@ for s = 1:sched.sessnum
     rho = 0;         % avg reward init
     ecost = 0;
     paa = [0.5 0.5]; % p(a) init
+    pa = [0.5 0.5]; % p(a) init
     k = 0; rt = 1; dI = 0; dV = 0; V = 0;
     sched.k = 1;
     %sched.setrew = 1;
@@ -127,7 +128,7 @@ for s = 1:sched.sessnum
         %% action selection
         act = theta'*phi+log(paa)';  % action probabilities
         pi_as = [1/(1+exp(-(act(1)-act(2)))) 1-(1/(1+exp(-(act(1)-act(2)))))];
-        %pi_as = exp((theta'*phi)' + log(paa));
+        %pi_as = exp((theta'*phi)' + log(pa));
         
         %pi_as(pi_as>100) = 100;
         %pi_as(pi_as<-100) = -100;
@@ -155,11 +156,11 @@ for s = 1:sched.sessnum
         end
         
         % reward counter
-         if x(t) == 2   % if you just saw reward
+        if x(t) == 2   % if you just saw reward
             k = k+1;    % counter for # rewards
             rt = t;     % log the timestep of last reward
             RT(k) = rt; % counter for reward times
-         end
+        end
         
         %% policy complexity
         if k > 1 % after 2 rewards, start using marginal, or else too much initial bias
@@ -184,65 +185,82 @@ for s = 1:sched.sessnum
         switch sched.model % different models with different costs
             case 1 % no action cost, no complexity cost
                 r = deval(t)*double(x(t)==2);                % reward (deval is a flag for whether we are in deval mode)
-                rpe = r - rho + w'*(phi-phi0);               % TD error
                 rho =  rho + alpha_r *(r - rho);             % average reward update
+                rpe = r - rho + w'*(phi-phi0);               % TD error
             case 2 % yes action cost, no complexity cost
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                rpe = r - rho + w'*(phi-phi0);
                 rho =  rho + alpha_r *(r - rho);
+                rpe = r - rho + w'*(phi-phi0);
             case 3  % yes action cost, yes complexity cost (fixed)
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
                 rho =  rho + alpha_r *(r - rho);
+                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
             case 4  % yes action cost, yes complexity cost (adaptive)
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
                 ecost0 = ecost;
-                ecost =  ecost  + 0.01*(cost - ecost);
-          
-                if k > 2 %&& x(t) == 2 && deval(t)==1
-                    % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
-                    % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
-                    dI = ecost - ecost0;
-                    %dI = mean(results(s).ecost(RT(k-1):RT(k))) - mean(results(s).ecost(RT(k-2):RT(k-1)));
-                    %V = results(s).rho(RT(k));
-                    beta = beta + alpha_b*(dI/rho);
-                    
-                    % dV = mean(results(s).r(RT(k-1):RT(k))) - mean(results(s).r(RT(k-2):RT(k-1)));
-                    % beta = dI/dV;
-                    
-                    % bounds on beta
-                    if beta < 0
-                        %disp('!')
-                        beta = 0.1;
-                    elseif beta > sched.cmax
-                        %disp('!')
-                        beta = sched.cmax;
-                    end
-                    
+                ecost =  ecost + alpha_r * (cost - ecost);
+                rho0 = rho;
+                rho =  rho + alpha_r * (r - rho);
+                
+                %if k > 2 && x(t) == 2 && deval(t)==1
+                % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
+                %dI = mean(results(s).ecost(RT(k-1):RT(k)-1)) - mean(results(s).ecost(RT(k-2):RT(k-1)));
+                
+                % every trial, but doesn't work
+                % dI = ecost-ecost0;
+                % beta = beta + alpha_b*(dI/rho);
+                
+                % only at reward points -- fluctuates a lot but correct trend
+                %dI =
+                %V = mean([results(s).r(RT(k-1):t-1) r]);
+                %beta = beta + alpha_b*(dI/V);
+                
+                % only at reward points
+                dI = ecost - ecost0;
+                %dI = mean([results.cost(RT(k-1)+1:t-1) cost]) - mean(results.cost(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
+                %dV = mean([results.r(RT(k-1)+1:t-1) r]) - mean(results.r(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
+                %dI = ecost - results.ecost(RT(k-1));
+                %V = mean([results(s).r(RT(k-1)+1:t-1) r]); % vs rho
+                %dV = results(s).rho-
+                beta = beta + alpha_b*dI; % problem bc rho is almost always 0, absorb it into the learning rate
+                
+                % every timestep?
+                %dI = ecost-ecost0;
+                %dV = rho-rho0;
+                %beta = beta + alpha_b*(beta - dI/dV);
+                
+                % bounds on beta
+                if beta < 0
+                    %disp('!')
+                    beta = 0.1;
+                elseif beta > sched.cmax
+                    %disp('!')
+                    beta = sched.cmax;
                 end
+                %end
+                
                 
                 rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
-                rho =  rho + alpha_r *(r - rho);
-                
-                if x(t) == 2
-                    RPE.rew(t) = rpe;
-                    RPE.nonrew(t) = NaN;
-                    NA.rew(t) = na;
-                    NT.rew(t) = nt;
-                    NA.nonrew(t) = NaN;
-                    NT.nonrew(t) = NaN;
-                   
-          
-                else
-                    RPE.rew(t) = NaN;
-                    RPE.nonrew(t) = rpe;
-                    NA.rew(t) = NaN;
-                    NT.rew(t) = NaN;
-                    NA.nonrew(t) = na;
-                    NT.nonrew(t) = nt;
-                end
-                 VS(t) = w'*(phi-phi0);
         end
+        
+        if x(t) == 2
+            RPE.rew(t) = rpe;
+            RPE.nonrew(t) = NaN;
+            NA.rew(t) = na;
+            NT.rew(t) = nt;
+            NA.nonrew(t) = NaN;
+            NT.nonrew(t) = NaN;
+            
+            
+        else
+            RPE.rew(t) = NaN;
+            RPE.nonrew(t) = rpe;
+            NA.rew(t) = NaN;
+            NT.rew(t) = NaN;
+            NA.nonrew(t) = na;
+            NT.nonrew(t) = nt;
+        end
+        VS(t) = w'*(phi-phi0);
         
         if isnan(rpe) || isinf(rpe)
             keyboard
@@ -308,8 +326,10 @@ for s = 1:sched.sessnum
 end
 
 % check expected cost
-figure; plot(results.ecost); hold on; plot(results.cost);
-figure; plot(results.dI,'k'); hold on; plot(results.rho,'r');
+%figure; hold on; plot(results.cost);plot(results.ecost,'k');
+%figure; plot(results.dI,'k'); hold on; plot(results.rho,'r');
+%figure; plot(results.beta)
+
 end
 
 
