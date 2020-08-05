@@ -26,11 +26,11 @@ addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                 
 % params: [R  I  model timeSteps  beta  cmax  deval]
 if nargin <1
     params =  [20 20 4 3000 1 100 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr
-    aparams = [0.1 0.1 0.01 1 0.05];
+    aparams = [0.05 0.05 0.05 0.05 0.04];
     % aparams = [1 1 1 1 1];
-    type = {'VR','VI'};
+    %type = {'VR','VI'};
     type = {'FR','VR','FI','VI'};
-    % type = 'VI';
+    %type = 'VI';
 end
 
 % agent parameters
@@ -85,10 +85,10 @@ sched.timeSteps = timeSteps;
 
 % repetitions
 sched.sessnum = 1;               % number of sessions
-numsub = 5;                       % how many iterations/agents to run / avg over
-sched.devalTime = timeSteps;      % timestep where outcome gets devalued
-sched.setrew = 0;                 % ONLY FR/VR - are we setting # of rewards that need to be achieved? 0 for no, 1 for until 50 rewards reached
-sched.deval = 1;
+numrats = 5;                     % how many iterations/agents to run / avg over
+sched.devalTime = timeSteps;     % timestep where outcome gets devalued
+sched.setrew = 0;                % ONLY FR/VR - are we setting # of rewards that need to be achieved? 0 for no, 1 for until 50 rewards reached
+sched.deval = deval;
 sched.devalsess = [2 10 20];  % sessions where devaluation will occur
 % sched.devalsess = [2 10];  % sessions where devaluation will occur
 
@@ -97,7 +97,7 @@ run = 1;
 if sched.sessnum > 1                 % multiple sessions
     % run simulations
     if run == 1
-        for i = 1:numsub % for each iteration
+        for i = 1:numrats % for each iteration
             results(i).sess = habitAgent(sched, agent); % # schedule types x 20 sessions
         end
         save('results.mat','results')
@@ -112,6 +112,7 @@ else
     if run == 1
         for i = 1:length(type)% for each iteration
             sched.type = type{i};
+            sched.devalsess = 1;
             results(i,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
         end
         save('results_1.mat','results')
@@ -124,7 +125,7 @@ end
 
 end
 function makePlots(results, sched, type)
-diagn = 0;
+
 %% init color map
 map = brewermap(4,'*RdBu');
 temp = map(3,:);
@@ -133,7 +134,9 @@ map(4,:) = temp;  % swap colors so darker ones are fixed
 set(0, 'DefaultAxesColorOrder', map) % first three rows
 
 timeSteps = sched.timeSteps;
-
+diagn = 1;
+sched.deval = 1;
+timeSteps = sched.devalTime+300;
 
 %% cumulative sum plots
 num = 200; % last how many # trials to look at
@@ -187,7 +190,7 @@ end
 %% probability of action (actual policy)
 for i = 1:length(type)
     ps = (sum(results(i).ps,2)./sum(results(i).ps(:)));
-    results(i).PAS = exp(results(i).theta(:,:,end) + log(results(i).paa(end,:)));
+    results(i).PAS = exp(results(i).theta(:,:,end));
     results(i).PAS = results(i).PAS./sum(results(i).PAS,2);
     
     results(i).MI = sum(results(i).PAS.*log(results(i).PAS./results(i).paa(end,:)),2);
@@ -205,7 +208,7 @@ if length(type)==4 % if doing all 4 schedules at once
     imagesc([results(3).PAS(:,2) results(4).PAS(:,2)])
     set(gca,'xtick',[1:2],'xticklabel',type([3 4]))
     subprettyplot(1,2)
-    suptitle('p(a|s) = exp[\theta + log P(a)]')
+    suptitle('p(a|s) = exp[\theta]')
 else
     figure; hold on;
     for i = 1:length(type)
@@ -216,7 +219,7 @@ else
         ylabel('state feature');
         prettyplot
     end
-    suptitle('p(a|s) = exp[\theta + log P(a)]')
+    suptitle('p(a|s) = exp[\theta]')
 end
 
 %% visualize weights

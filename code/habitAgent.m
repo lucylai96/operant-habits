@@ -67,32 +67,39 @@ end
 % weights
 phi = [Adt(:,1); Tdt(:,1)];     % features
 theta  = zeros(length(phi),2);  % policy weights
-theta(:,1) = 0.4;              % bias to not do anything
-theta(:,2) = -0.4;              % bias to not do anything
+%theta(:,1) = 0.4;              % bias to not do anything
+%theta(:,2) = -0.4;              % bias to not do anything
 w = zeros(length(phi),1);       % value weights
 num = 10;                       % marginal action probability over the last num seconds
 
 for s = 1:sched.sessnum
     % at start of every session reset these initial values
+    rho_c = 0;
     phi = [Adt(:,1); Tdt(:,1)]; % features
     ps = zeros(length(phi),1);
     x = [2];         % observation array init
     a = [2];         % action array init
     k = 1; na = 1; nt = 1; NA.rew(k) = na; NT.rew(k) = nt;
-    rho = 0;         % avg reward init
+    rho0 = 0;
+   rho = 0;         % avg reward init
+    rho2 = 0;
     ecost = 0;
     paa = [0.5 0.5]; % p(a) init
     pa = [0.5 0.5]; % p(a) init
     k = 0; rt = 1; dI = 0; dV = 0; V = 0;
     sched.k = 1;
-    %sched.setrew = 1;
+    if sched.sessnum>1
+        sched.setrew = 1;
+    end
     deval = ones(1,sched.timeSteps);        % a vector indicating when devaluation "turns on"
     deval(:,sched.devalTime:end) = 0;       % 0 means devaluation mode
-    
+    satia = zeros(1,sched.timeSteps);
     if ismember(s,sched.devalsess) && sched.deval == 1
-        timeSteps = sched.timeSteps+300;  % devaluation test period = 5 mins (300 timeSteps)
-        deval = ones(1,timeSteps);        % a vector indicating when devaluation "turns on"
-        deval(:,sched.devalTime:end) = 0;       % 0 means devaluation mode
+        timeSteps = sched.timeSteps+3600+300;    % satiation + devaluation test period = 5 mins (300 timeSteps)
+        satia = zeros(1,timeSteps);              % a vector indicating when satiation "turns on"
+        satia(:,sched.devalTime:end-300) = 1;              % a vector indicating when satiation "turns on"
+        deval = ones(1,timeSteps);               % a vector indicating when devaluation "turns on"
+        deval(:,end-300:end) = 0;        % 1 means devaluation mode
     else
         timeSteps = sched.timeSteps;
     end
@@ -109,13 +116,19 @@ for s = 1:sched.sessnum
             na = nS;
         end
         
+        
         if x(t-1)==2 % if you just saw reward, reinit state features (end of "episode")
             phi0 = [Adt(:,1); Tdt(:,1)]; % features
         else
             phi0 = phi;
         end
-        phi = [Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
-        phi(isnan(phi)) = 0;
+        
+        if satia(t) == 1
+            phi = ones(length(Adt)+length(Tdt),1);
+        else
+            phi = [Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
+            phi(isnan(phi)) = 0;
+        end
         
         %% action history
         if t>num
@@ -126,7 +139,7 @@ for s = 1:sched.sessnum
         pa = pa+0.01; pa = pa./sum(pa);
         
         %% action selection
-        act = theta'*phi+log(paa)';  % action probabilities
+        act = theta'*phi;  % action probabilities
         pi_as = [1/(1+exp(-(act(1)-act(2)))) 1-(1/(1+exp(-(act(1)-act(2)))))];
         %pi_as = exp((theta'*phi)' + log(pa));
         
@@ -142,6 +155,9 @@ for s = 1:sched.sessnum
         if exist('input') == 1 && t<size(input(:,:,s),2)  % if fitting to data, condition on data
             a(t) = input(1,t,s)+1; % 1 means nothing, 2 means lever press
             x(t) = input(2,t,s)+1; % 1 means nothing, 2 means reward
+        elseif satia(t)==1 %satiation manipulation
+            a(t) = 1;
+            x(t) = 2;
         else
             % policy sampled stochastically
             if rand < pi_as(1)
@@ -173,7 +189,7 @@ for s = 1:sched.sessnum
         end
         
         % should encompass all states and actions (entire policy)
-        pas = exp(theta+log(paa));                                     % entire state dep policy
+        pas = exp(theta);                                     % entire state dep policy
         pas = pas./sum(pas,2);
         
         mi = nansum(ps.*nansum(pas.*log(pas./paa),2));                 % mutual information
@@ -181,67 +197,92 @@ for s = 1:sched.sessnum
         cost0 = log(pi_as./paa);
         cost = cost0(a(t));                                            % policy cost for that state-action pair
         
+        ecost0 = ecost;
+        ecost =  ecost + alpha_r * (cost - ecost);
+        
+     
+        
         %% TD update
         switch sched.model % different models with different costs
             case 1 % no action cost, no complexity cost
                 r = deval(t)*double(x(t)==2);                % reward (deval is a flag for whether we are in deval mode)
-                rho =  rho + alpha_r *(r - rho);             % average reward update
                 rpe = r - rho + w'*(phi-phi0);               % TD error
             case 2 % yes action cost, no complexity cost
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                rho =  rho + alpha_r *(r - rho);
                 rpe = r - rho + w'*(phi-phi0);
+                 rho =  rho + alpha_r *(r - rho);
             case 3  % yes action cost, yes complexity cost (fixed)
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                rho =  rho + alpha_r *(r - rho);
                 rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
             case 4  % yes action cost, yes complexity cost (adaptive)
                 r = deval(t)*double(x(t)==2)-acost*(a(t)==2);
-                ecost0 = ecost;
-                ecost =  ecost + alpha_r * (cost - ecost);
-                rho0 = rho;
-                rho =  rho + alpha_r * (r - rho);
+                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
                 
                 %if k > 2 && x(t) == 2 && deval(t)==1
-                % dI = mean(results(sess).mi(t-num)) - mean(results(sess).mi(t-2*num:t-num)); % change in policy complexity
-                %dI = mean(results(s).ecost(RT(k-1):RT(k)-1)) - mean(results(s).ecost(RT(k-2):RT(k-1)));
-                
-                % every trial, but doesn't work
-                % dI = ecost-ecost0;
-                % beta = beta + alpha_b*(dI/rho);
-                
-                % only at reward points -- fluctuates a lot but correct trend
-                %dI =
-                %V = mean([results(s).r(RT(k-1):t-1) r]);
-                %beta = beta + alpha_b*(dI/V);
-                
-                % only at reward points
-                dI = ecost - ecost0;
-                %dI = mean([results.cost(RT(k-1)+1:t-1) cost]) - mean(results.cost(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
-                %dV = mean([results.r(RT(k-1)+1:t-1) r]) - mean(results.r(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
-                %dI = ecost - results.ecost(RT(k-1));
-                %V = mean([results(s).r(RT(k-1)+1:t-1) r]); % vs rho
-                %dV = results(s).rho-
-                beta = beta + alpha_b*dI; % problem bc rho is almost always 0, absorb it into the learning rate
-                
-                % every timestep?
-                %dI = ecost-ecost0;
-                %dV = rho-rho0;
-                %beta = beta + alpha_b*(beta - dI/dV);
-                
-                % bounds on beta
-                if beta < 0
-                    %disp('!')
-                    beta = 0.1;
-                elseif beta > sched.cmax
-                    %disp('!')
-                    beta = sched.cmax;
-                end
+                    
+                    % every trial, but doesn't work
+                    % dI = ecost-ecost0;
+                    % beta = beta + alpha_b*(dI/rho);
+                    
+                    % only at reward points -- fluctuates a lot but correct trend
+                    %dI = mean([results.ecost(RT(k-1)+1:t-1) ecost]) - mean(results.ecost(RT(k-2)+1:RT(k-1)));
+                    %V = mean([results(s).r(RT(k-1):t-1) r]);
+                    %beta = beta + alpha_b*(dI/V);
+                    
+                    % only at reward points -- fluctuates a lot but correct trend
+                    %dI = ecost - results.ecost(RT(k-1));
+                    %dV = rho - results.rho(RT(k-1));
+                    %beta = beta + alpha_b*(dI/dV - beta);
+                    
+                    %dI = mean([results(s).cost(RT(k-1)+1:t-1) cost]) - mean(results(s).cost(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
+                    %dI = ecost - results.ecost(RT(k-1));
+                    dI = ecost - ecost0;%results.ecost(RT(k-1));
+                    dV = rho - rho0;
+                    %dV = mean([results.r(RT(k-1)+1:t-1) r]) - mean(results.r(RT(k-2)+1:RT(k-1))); % diff in reward over last two reward intervals
+                    %beta = beta + alpha_b*(dI/dV - beta);
+                    %beta = beta + alpha_b*(dI);%/V);
+                    if rho > -0.001 && rho < 0.001
+                        rho = 0.001;
+                        rho_c = rho_c + 1;
+                    end
+                    
+                    if dV> -0.001 && dV < 0.001
+                        dV = 0.001;
+                    end
+                    
+                    beta = beta + alpha_b*(dI/rho);
+                    %beta = beta + alpha_b*(dI/dV - beta);
+                    
+                    % only at reward points (problem is that dV is often too small)
+                    %dI = mean([results.ecost(RT(k-1)+1:t-1) ecost]) - mean(results.ecost(RT(k-2)+1:RT(k-1))); % diff in cost over last two reward intervals
+                    %dV = mean([results.rho(RT(k-1)+1:t-1) rho]) - mean(results.rho(RT(k-2)+1:RT(k-1))); % diff in reward over last two reward intervals
+                    %beta = beta + alpha_b*(beta - dI/dV);
+                    
+                    % every timestep?
+                    %dI = ecost-ecost0;
+                    %dV = rho-rho0;
+                    %if dV < 0.001
+                    %    dV = 0.001;
+                    %end
+                    %dV = dV*1000;
+                    %beta = beta + alpha_b*(beta - dI/dV);
+                    
+                    % bounds on beta
+                    if beta < 0
+                        %disp('!')
+                        beta = 0.1;
+                    elseif beta > sched.cmax
+                        %disp('!')
+                        beta = sched.cmax;
+                    end
                 %end
                 
                 
-                rpe = r - rho + w'*(phi-phi0)-(1/beta)*cost;
+            
         end
+        rho0 = rho;
+        rho =  rho + alpha_r *(r - rho);             % average reward update
+        rho2 =  rho2 + alpha_r*rpe;             % average reward update
         
         if x(t) == 2
             RPE.rew(t) = rpe;
@@ -250,8 +291,6 @@ for s = 1:sched.sessnum
             NT.rew(t) = nt;
             NA.nonrew(t) = NaN;
             NT.nonrew(t) = NaN;
-            
-            
         else
             RPE.rew(t) = NaN;
             RPE.nonrew(t) = rpe;
@@ -283,6 +322,7 @@ for s = 1:sched.sessnum
         results(s).x(t) = x(t);         % observation
         results(s).r(t) = r;            % instantaneous reward
         results(s).rho(t) = rho;        % expected reward (avg reward)
+        results(s).rho2(t) = rho2;        % expected reward (avg reward)
         results(s).rpe(t,:) = rpe;      % RPE
         results(s).pi_as(t,:) = pi_as;  % chosen policy
         
@@ -297,7 +337,7 @@ for s = 1:sched.sessnum
         results(s).mi(t) = mi;
         results(s).beta(t) = beta;
         results(s).dI(t) = dI;
-        %results(s).dV(t) = dV;
+        results(s).dV(t) = dV;
         %results(s).V(t) = V;
         
         t = t+1;
