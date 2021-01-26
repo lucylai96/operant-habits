@@ -1,6 +1,7 @@
 function habitCleanData
 % PURPOSE: clean Eric Garr's dataset to be in a format compatible for model
 % fitting
+
 % WRITTEN BY: Lucy Lai (May 2020)
 
 %% some notes about the dataset:
@@ -35,7 +36,7 @@ run = 1;
 
 if examp == 1 && run == 1
     example
-elseif run ==1
+elseif run == 1
     whole_dataset
 end
 
@@ -53,68 +54,135 @@ FI45 = schedule.FI;
 VI45 = schedule.RI;
 numsess = 20;
 numrats = 8;
-
+M2T = 0;
+max2t = 100;
 for r = 1:numrats
     for i = 1:numsess % for all sessions, convert timestamps to secs
         FR20.training.session(i).lever_time_stamps{r}(FR20.training.session(i).lever_time_stamps{r}==0)=[];
         FR20.training.session(i).lever_time_stamps{r} = ceil(FR20.training.session(i).lever_time_stamps{r}./100); % centisecs --> millisecond
         FR20.training.session(i).reward_time_stamps{r}(FR20.training.session(i).reward_time_stamps{r}==0) =[];
         FR20.training.session(i).reward_time_stamps{r} = ceil(FR20.training.session(i).reward_time_stamps{r}./100);
-        FR20.session(i).more2taps{r} = size(find(diff(FR20.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        m2t = 1;xidx = 1;
+        %length(FR20.training.session(i).lever_time_stamps{r})
+        
+        while m2t>max2t && min(FR20.training.session(i).lever_time_stamps{r}) >1
+            xidx = find(diff(FR20.training.session(i).lever_time_stamps{r})==0);
+            FR20.training.session(i).lever_time_stamps{r}(xidx) = FR20.training.session(i).lever_time_stamps{r}(xidx)-1;
+            m2t = length(find(diff(FR20.training.session(i).lever_time_stamps{r})==0));      % how many more than 2 taps in a decisecond
+        end
+        if m2t > max2t
+            M2T = M2T + 1;
+        end
+        
         FR20.training.session(i).lever_time_stamps{r} = unique(FR20.training.session(i).lever_time_stamps{r});
-
+        
         VR20.training.session(i).lever_time_stamps{r}(VR20.training.session(i).lever_time_stamps{r}==0)=[];
         VR20.training.session(i).lever_time_stamps{r} = ceil(VR20.training.session(i).lever_time_stamps{r}./100); % centisecs --> millisecond
         VR20.training.session(i).reward_time_stamps{r}(VR20.training.session(i).reward_time_stamps{r}==0) =[];
         VR20.training.session(i).reward_time_stamps{r} = ceil(VR20.training.session(i).reward_time_stamps{r}./100);
-        VR20.session(i).more2taps{r} = size(find(diff(VR20.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        m2t = 1;  xidx = 1;
+        %length(VR20.training.session(i).lever_time_stamps{r})
+        
+        while m2t>0 && min(VR20.training.session(i).lever_time_stamps{r}) >1
+            xidx = find(diff(VR20.training.session(i).lever_time_stamps{r})==0);
+            VR20.training.session(i).lever_time_stamps{r}(xidx) = VR20.training.session(i).lever_time_stamps{r}(xidx)-1;
+            m2t = length(find(diff(VR20.training.session(i).lever_time_stamps{r})==0));      % how many more than 2 taps in a decisecond
+        end
+         if m2t > 0
+            M2T = M2T + 1;
+        end
+        
         VR20.training.session(i).lever_time_stamps{r} = unique(VR20.training.session(i).lever_time_stamps{r});
-
+        
+        
         FI45.training.session(i).lever_time_stamps{r}(FI45.training.session(i).lever_time_stamps{r}==0)=[];
         FI45.training.session(i).lever_time_stamps{r} = ceil(FI45.training.session(i).lever_time_stamps{r}./100); % centisecs --> millisecond
         FI45.training.session(i).reward_time_stamps{r}(FI45.training.session(i).reward_time_stamps{r}==0) =[];
         FI45.training.session(i).reward_time_stamps{r} = ceil(FI45.training.session(i).reward_time_stamps{r}./100);
-        FI45.session(i).more2taps{r} = size(find(diff(FI45.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        m2t = 1;  xidx = 1;
+        %length(FI45.training.session(i).lever_time_stamps{r})
+        
+        while m2t>max2t && min(FI45.training.session(i).lever_time_stamps{r}) >1
+            xidx = find(diff(FI45.training.session(i).lever_time_stamps{r})==0);
+            FI45.training.session(i).lever_time_stamps{r}(xidx) = FI45.training.session(i).lever_time_stamps{r}(xidx)-1;
+            m2t = length(find(diff(FI45.training.session(i).lever_time_stamps{r})==0));      % how many more than 2 taps in a decisecond
+        end
+         if m2t > max2t
+            M2T = M2T + 1;
+        end
         FI45.training.session(i).lever_time_stamps{r} = unique(FI45.training.session(i).lever_time_stamps{r});
         
         VI45.training.session(i).lever_time_stamps{r}(VI45.training.session(i).lever_time_stamps{r}==0) =[];
         VI45.training.session(i).lever_time_stamps{r} = ceil(VI45.training.session(i).lever_time_stamps{r}./100); % centisecs --> decisecond
         VI45.training.session(i).reward_time_stamps{r}(VI45.training.session(i).reward_time_stamps{r}==0) =[];
         VI45.training.session(i).reward_time_stamps{r} = ceil(VI45.training.session(i).reward_time_stamps{r}./100);
-        VI45.session(i).more2taps{r} = size(find(diff(VI45.training.session(i).lever_time_stamps{r})==0),1); % how many more than 2 taps in a decisecond
+        m2t = 1;  xidx = 1;
+        %length(VI45.training.session(i).lever_time_stamps{r})
+        
+        while m2t>max2t && min(VI45.training.session(i).lever_time_stamps{r})>1
+            xidx = find(diff(VI45.training.session(i).lever_time_stamps{r})==0);
+            VI45.training.session(i).lever_time_stamps{r}(xidx) = VI45.training.session(i).lever_time_stamps{r}(xidx)-1;
+            m2t = length(find(diff(VI45.training.session(i).lever_time_stamps{r})==0));      % how many more than 2 taps in a decisecond
+        end
+         if m2t > max2t
+            M2T = M2T + 1;
+        end
         VI45.training.session(i).lever_time_stamps{r} = unique(VI45.training.session(i).lever_time_stamps{r});
         
     end
 end
-
+M2T
 %% reorganize data into: [0 1] depending on if reward was observed
 for r = 1:numrats
     for i = 1:numsess % for all sessions, convert timestamps to secs
         
         FR20n(r).session(i).training.lever_binned = zeros(1,max(FR20.training.session(i).lever_time_stamps{r}));
         FR20n(r).session(i).training.lever_binned(FR20.training.session(i).lever_time_stamps{r}) = 1;
-        FR20n(r).session(i).training.reward_binned = zeros(1,max(FR20.training.session(i).reward_time_stamps{r}));
+        FR20n(r).session(i).training.reward_binned = zeros(1,max(FR20.training.session(i).lever_time_stamps{r}));
         FR20n(r).session(i).training.reward_binned(FR20.training.session(i).reward_time_stamps{r}) = 1;
         FR20n(r).timeSteps(i) = max(FR20.training.session(i).lever_time_stamps{r});
+        k = 1;outTimes = [1; FR20.training.session(i).reward_time_stamps{r}];
+        for t = 1:length(outTimes)-1
+            if outTimes(t+1)> length(FR20n(r).session(i).training.lever_binned)
+                outTimes(t+1) = length(FR20n(r).session(i).training.lever_binned);
+            end
+            numAct(k) = sum(FR20n(r).session(i).training.lever_binned(outTimes(t):outTimes(t+1))); % sum up the number of actions between outTimes
+            k = k+1;
+        end
+        FR20n(r).session(i).actions = numAct;
         
         VR20n(r).session(i).training.lever_binned = zeros(1,max(VR20.training.session(i).lever_time_stamps{r}));
         VR20n(r).session(i).training.lever_binned(VR20.training.session(i).lever_time_stamps{r}) = 1;
-        VR20n(r).session(i).training.reward_binned = zeros(1,max(VR20.training.session(i).reward_time_stamps{r}));
+        VR20n(r).session(i).training.reward_binned = zeros(1,max(VR20.training.session(i).lever_time_stamps{r}));
         VR20n(r).session(i).training.reward_binned(VR20.training.session(i).reward_time_stamps{r}) = 1;
         VR20n(r).timeSteps(i) = max(VR20.training.session(i).lever_time_stamps{r});
+        
+        clear numAct
+        k = 1;
+        outTimes = [1; VR20.training.session(i).reward_time_stamps{r}];
+        for t = 1:length(outTimes)-1
+            if outTimes(t+1)> length(VR20n(r).session(i).training.lever_binned)
+                outTimes(t+1) = length(VR20n(r).session(i).training.lever_binned);
+            end
+            numAct(k) = sum(VR20n(r).session(i).training.lever_binned(outTimes(t):outTimes(t+1))); % sum up the number of actions between outTimes
+            k = k+1;
+        end
+        VR20n(r).session(i).actions = numAct;
+        
         
         FI45n(r).session(i).training.lever_binned = zeros(1, 2290);
         FI45n(r).session(i).training.lever_binned(FI45.training.session(i).lever_time_stamps{r}) = 1;
         FI45n(r).session(i).training.reward_binned = zeros(1, 2290);
         FI45n(r).session(i).training.reward_binned(FI45.training.session(i).reward_time_stamps{r}) = 1;
         FI45n(r).timeSteps(i) = 2290;
+        FI45n(r).session(i).times = [diff([1; FI45.training.session(i).reward_time_stamps{r}])];
         
         VI45n(r).session(i).training.lever_binned = zeros(1, 2290);
         VI45n(r).session(i).training.lever_binned(VI45.training.session(i).lever_time_stamps{r})= 1;
         VI45n(r).session(i).training.reward_binned = zeros(1, 2290);
         VI45n(r).session(i).training.reward_binned(VI45.training.session(i).reward_time_stamps{r})= 1;
         VI45n(r).timeSteps(i) = 2290;
-        VI45n(r).times = [diff([1; VI45.training.session(i).reward_time_stamps{r}])];
+        VI45n(r).session(i).times = [diff([1; VI45.training.session(i).reward_time_stamps{r}])];
         
         FR.actRate(r,i) = sum(FR20n(r).session(i).training.lever_binned)./FR20n(r).timeSteps(i);
         VR.actRate(r,i) = sum(VR20n(r).session(i).training.lever_binned)./VR20n(r).timeSteps(i);
@@ -123,15 +191,11 @@ for r = 1:numrats
         
     end
 end
-% timeSteps (unrolled)
-% timeSteps = [FR20.timeSteps(1) FR20.timeSteps(2) FR20.timeSteps(3);
-%     VR20.timeSteps(1) VR20.timeSteps(2) VR20.timeSteps(3);
-%     FI45.timeSteps(1) FI45.timeSteps(2) FI45.timeSteps(3);
-%     VI45.timeSteps(1) VI45.timeSteps(2) VI45.timeSteps(3)];
+
 for d = 1:3 % 3 deval sessions
     FR.test(:,:,d) = [FR20.test.cycle(d).lever_presses.valued FR20.test.cycle(d).lever_presses.devalued];
     VR.test(:,:,d) = [VR20.test.cycle(d).lever_presses.valued VR20.test.cycle(d).lever_presses.devalued];
-
+    
     FI.test(:,:,d) = [FI45.test.cycle(d).lever_presses.valued FI45.test.cycle(d).lever_presses.devalued];
     VI.test(:,:,d) = [VI45.test.cycle(d).lever_presses.valued VI45.test.cycle(d).lever_presses.devalued];
 end
@@ -139,22 +203,8 @@ FR20 = FR;
 VR20 = VR;
 FI45 = FI;
 VI45 = VI;
+
 save('all_data_cleaned.mat','FI45','VI45','FI45n','VI45n','FR20','VR20','FR20n','VR20n')
-
-timeSteps = [FI45(r).timeSteps(1) FI45.timeSteps(2) FI45.timeSteps(3);
-    VI45.timeSteps(1) VI45.timeSteps(2) VI45.timeSteps(3)];
-
-% mean lever presses per min (unrolled)
-test_lever_rates.valued = [FI45.session(1).test_lever_rates.valued FI45.session(2).test_lever_rates.valued FI45.session(3).test_lever_rates.valued;
-    VI45.session(1).test_lever_rates.valued VI45.session(2).test_lever_rates.valued VI45.session(3).test_lever_rates.valued];
-test_lever_rates.devalued = [FR20.session(1).test_lever_rates.devalued FR20.session(2).test_lever_rates.devalued FR20.session(3).test_lever_rates.devalued;
-    VR20.session(1).test_lever_rates.devalued VR20.session(2).test_lever_rates.devalued VR20.session(3).test_lever_rates.devalued;
-    FI45.session(1).test_lever_rates.devalued FI45.session(2).test_lever_rates.devalued FI45.session(3).test_lever_rates.devalued;
-    VI45.session(1).test_lever_rates.devalued VI45.session(2).test_lever_rates.devalued VI45.session(3).test_lever_rates.devalued];
-
-
-save('all_data_cleaned.mat','FI45','VI45','timeSteps','test_lever_rates'); % save
-
 
 end
 
@@ -218,19 +268,18 @@ for i = 1:4
     FR20.session(i).training.reward_binned(FR20.session(i).training.reward_time_stamps) = 1;
     FR20.timeSteps(i) = length(FR20.session(i).training.lever_binned);
     
-    %        k = 1;outTimes = FR20.session(i).training.reward_time_stamps;
-    %     for t = 1:length(outTimes)-1
-    %         numAct(k) = sum(FR20.session(i).training.lever_binned(outTimes(t):outTimes(t+1))); % sum up the number of actions between outTimes
-    %         k = k+1;
-    %     end
-    %
+    k = 1;outTimes = [1 FR20.session(i).training.reward_time_stamps];
+    for t = 1:length(outTimes)-1
+        numAct(k) = sum(FR20.session(i).training.lever_binned(outTimes(t):outTimes(t+1))); % sum up the number of actions between outTimes
+        k = k+1;
+    end
+    
     VR20.session(i).training.lever_binned = zeros(1, max(VR20.session(i).training.lever_time_stamps));
     VR20.session(i).training.lever_binned(VR20.session(i).training.lever_time_stamps) = 1;
     VR20.session(i).training.reward_binned = zeros(1, max(VR20.session(i).training.lever_time_stamps));
     VR20.session(i).training.reward_binned(VR20.session(i).training.reward_time_stamps) = 1;
     VR20.timeSteps(i) = length(VR20.session(i).training.lever_binned);
-    k = 1;
-    outTimes = [1; VR20.session(i).training.reward_time_stamps];
+    k = 1; outTimes = [1; VR20.session(i).training.reward_time_stamps];
     for t = 1:length(outTimes)-1
         numAct(k) = sum(VR20.session(i).training.lever_binned(outTimes(t):outTimes(t+1))); % sum up the number of actions between outTimes
         k = k+1;

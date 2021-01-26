@@ -1,6 +1,6 @@
 function habitFitData
 % PURPOSE: Fitting to Eric Garr's data
-% REQUIRE: example_rats_cleaned.mat
+% REQUIRE: example_rats_cleaned.mat (just for 1 rat)
 % WRITTEN BY: Lucy Lai (May 2020)
 
 % Sessions:

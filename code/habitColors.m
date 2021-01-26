@@ -21,7 +21,7 @@ if nargin > 1
     
 else
 set(0, 'DefaultAxesColorOrder', map) % first three rows
-set(0, 'DefaultLineLineWidth', 1.5) % set line width
+set(0, 'DefaultLineLineWidth', 2) % set line width
 end
 
 end

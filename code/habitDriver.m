@@ -22,23 +22,27 @@ clear all
 close all
 
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                  % various plot tools
+habitColors;
 
-% params: [R  I  model timeSteps  beta  cmax  deval]
+% params: [R  I  model timeSteps  beta_0  deval]
+% aparams: [alpha_w  alpha_th  alpha_pi  alpha_b  acost cmax]
 if nargin <1
-    params =  [20 20 4 3000 1 100 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr
-    aparams = [0.05 0.05 0.05 0.05 0.04];
-    % aparams = [1 1 1 1 1];
-    %type = {'VR','VI'};
+    params =  [20 20 4 5000 0.5 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
+    aparams = [0.01 0.01 0.1 0.001 0.03 0.5];
     type = {'FR','VR','FI','VI'};
-    %type = 'VI';
 end
+run = 1; 
+sched.sessnum = 1;                  % number of sessions
 
 % agent parameters
 agent.alpha_w = aparams(1);         % value learning rate
 agent.alpha_t = aparams(2);         % policy learning rate
-agent.alpha_r = aparams(3);         % rho learning rate
+agent.alpha_pi = aparams(3);        % marginal policy learning rate
 agent.alpha_b = aparams(4);         % beta learning rate
-agent.acost = aparams(5);           % act
+agent.acost = aparams(5);           % action cost
+agent.cmax = aparams(6);            % max complexity
+agent.alpha_r = 0.001;              % rho learning rate
+agent.alpha_e = 0.001;              % policy cost learning rate
 
 % FR-20: 30 daily sessions, sessions terminated when 50 rewards were earned or 1 hour elapsed. Satiety devaluation test after sessions 2, 10, 20, and 30.
 % VR-20: same as above
@@ -48,24 +52,20 @@ agent.acost = aparams(5);           % act
 % FR/VR 50 rewards OR 60 minutes = 3600 timesteps x 30 sessions
 % FI/VI 38 minutes = 2280 timesteps x 20 sessions
 
-% need code that intakes number of sessions
-
 %% unpack parameters
 sched.R = params(1);
 sched.I = params(2);
 model = params(3);
 timeSteps = params(4);
 beta = params(5);
-cmax = params(6);
-deval = params(7);
-
+deval = params(6);
 
 %% using data?
 garr = 0;
 if garr == 1
-    %load('all_data_cleaned.mat')
-    %sched.times =
-    %sched.actions =
+    load('all_data_cleaned.mat')
+    sched.times = cat(1,VI45n(1).session(:).times)';
+    sched.actions = cat(2,VR20n(1).session(:).actions);
 else
     % for VI only
     sched.times = contingency_generateVI(sched.I);   % pre-generated wait times before reward
@@ -77,49 +77,68 @@ end
 %% initialize
 sched.model = model;     % which lesioned model to run
 sched.beta = beta;       % starting beta; high beta = low cost. beta should increase for high contingency
-sched.cmax = cmax;       % max complexity (low v high)
 sched.type = type;
-
 sched.k = 1;
 sched.timeSteps = timeSteps;
 
 % repetitions
-sched.sessnum = 1;               % number of sessions
 numrats = 5;                     % how many iterations/agents to run / avg over
-sched.devalTime = timeSteps;     % timestep where outcome gets devalued
-sched.setrew = 0;                % ONLY FR/VR - are we setting # of rewards that need to be achieved? 0 for no, 1 for until 50 rewards reached
+sched.trainEnd = timeSteps;      % timestep where outcome gets devalued
 sched.deval = deval;
-sched.devalsess = [2 10 20];  % sessions where devaluation will occur
-% sched.devalsess = [2 10];  % sessions where devaluation will occur
+sched.devalsess = [2 10 20];     % sessions where devaluation will occur
+% sched.devalsess = [2 10];      % sessions where devaluation will occur
 
-run = 1;
-
-if sched.sessnum > 1                 % multiple sessions
-    % run simulations
-    if run == 1
-        for i = 1:numrats % for each iteration
-            results(i).sess = habitAgent(sched, agent); % # schedule types x 20 sessions
-        end
-        save('results.mat','results')
-    else
-        load('results.mat')
-    end
-    
-    makePlotsSess(results, sched,type)
+if sched.deval == 1
+    sched.devalWin = 20; % 1 hour of satiation manipulation
+    sched.testWin = 300;
+    sched.trainEnd = sched.timeSteps;
+    sched.devalEnd = sched.trainEnd + sched.devalWin;
 else
-    
-    % run simulations
-    if run == 1
-        for i = 1:length(type)% for each iteration
-            sched.type = type{i};
-            sched.devalsess = 1;
-            results(i,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
+    sched.trainEnd = sched.timeSteps;
+    sched.devalEnd = sched.trainEnd;
+end
+
+if sched.sessnum > 1       % multiple sessions
+    for t = 1:length(type) % for each iteration
+        sched.type = type{t};
+        
+        if run == 1            % run simulations for 1 type at a time
+            for i = 1:numrats  % for each iteration
+                results(i).sess = habitAgent(sched, agent); % # schedule types x 20 sessions
+            end
+            save(strcat('results',sched.type,'.mat'),'results')
+        else
+            load(strcat('results',sched.type,'.mat'),'results')
         end
-        save('results_1.mat','results')
-    else
-        load('results_1.mat')
+        makePlotsSess(results, sched,type)
     end
     
+else
+    if run == 1                % run simulations for all types
+        sched.devalsess = 1;
+        for t = 1:length(type) % for each iteration
+            sched.type = type{t};
+            if garr ==1
+                if sched.type == 'FR'
+                    data = FR20n(1);
+                elseif sched.type == 'VR'
+                    data = VR20n(1);
+                elseif sched.type == 'FI'
+                    data = FI45n(1);
+                elseif sched.type == 'VI'
+                    data = VI45n(1);
+                end
+                input.data = data;
+                results(t,:) = habitAgent(sched, agent, input.data); % # schedule types x 20 sessions
+            else
+                
+                results(t,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
+            end
+        end
+        save('results_all.mat','results')
+    else
+        load('results_all.mat')
+    end
     makePlots(results, sched, type)
 end
 
@@ -133,168 +152,266 @@ map(3,:) = map(4,:);
 map(4,:) = temp;  % swap colors so darker ones are fixed
 set(0, 'DefaultAxesColorOrder', map) % first three rows
 
-timeSteps = sched.timeSteps;
-diagn = 1;
-sched.deval = 1;
-timeSteps = sched.devalTime+300;
+diagn = 0;
 
-%% cumulative sum plots
+%% cumulative sum plots (Fig 1)
 num = 200; % last how many # trials to look at
 
 figure; hold on;
 for i = 1:length(type)
-    results(i).cs = cumsum(results(i).a(end-num:end)-1);
+    results(i).cs = cumsum(results(i).a(sched.trainEnd-num:sched.trainEnd)==2);
+    if i ==2
+        h(i,:) = plot(results(i).cs+5,'Color',map(i,:),'LineWidth',2);
+        xplot = find(results(i).x(sched.trainEnd-num:sched.trainEnd)==2);
+        line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']'+5,'LineWidth',2,'Color','k');
+    else
     h(i,:) = plot(results(i).cs,'Color',map(i,:),'LineWidth',2);
-    xplot = find(results(i).x(end-num:end)==2);
+    xplot = find(results(i).x(sched.trainEnd-num:sched.trainEnd)==2);
     line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']','LineWidth',2,'Color','k');
+    end
+    
 end
 
 legend(h,type);
 legend('boxoff')
-xlabel('time')
+xlabel('time (s)')
 ylabel('cumulative # actions')
 prettyplot
 
-%% probability of action (learned policy weights)
-for i = 1:length(type)
-    results(i).Pa = exp(results(i).theta);
-    results(i).Pa = results(i).Pa./sum(results(i).Pa,2);
-end
-if length(type)==4 % if doing all 4 schedules at once
-    figure; subplot 121;
-    colormap(flipud(gray))
-    imagesc([results(1).Pa(:,2,end) results(2).Pa(:,2,end)])
-    set(gca,'xtick',[1:2],'xticklabel',type([1 2]))
-    ylabel('state feature')
-    subplot 122;
-    colormap(flipud(gray))
-    imagesc([results(3).Pa(:,2,end) results(4).Pa(:,2,end)])
-    set(gca,'xtick',[1:2],'xticklabel',type([3 4]))
-    subprettyplot(1,2)
-    
-    suptitle('policy weights, exp(\theta)')
-else
-    figure; hold on;
-    for i = 1:length(type)
-        subplot(1,length(type),i);
-        colormap(flipud(gray))
-        imagesc(results(i).Pa(:,2,end))
-        set(gca,'xtick',1,'xticklabel',type{i})
-        ylabel('state feature');
-        prettyplot
-    end
-    suptitle('policy weights, exp(\theta)')
-end
-
-
-%% probability of action (actual policy)
-for i = 1:length(type)
-    ps = (sum(results(i).ps,2)./sum(results(i).ps(:)));
-    results(i).PAS = exp(results(i).theta(:,:,end));
-    results(i).PAS = results(i).PAS./sum(results(i).PAS,2);
-    
-    results(i).MI = sum(results(i).PAS.*log(results(i).PAS./results(i).paa(end,:)),2);
-    results(i).MIMI = sum(ps.*sum(results(i).PAS.*log(results(i).PAS./results(i).paa(end,:)),2));
-end
-
-if length(type)==4 % if doing all 4 schedules at once
-    figure; subplot 121;
-    colormap(flipud(gray))
-    imagesc([results(1).PAS(:,2) results(2).PAS(:,2)])
-    set(gca,'xtick',[1:2],'xticklabel',type([1 2]))
-    ylabel('state feature')
-    subplot 122;
-    colormap(flipud(gray))
-    imagesc([results(3).PAS(:,2) results(4).PAS(:,2)])
-    set(gca,'xtick',[1:2],'xticklabel',type([3 4]))
-    subprettyplot(1,2)
-    suptitle('p(a|s) = exp[\theta]')
-else
-    figure; hold on;
-    for i = 1:length(type)
-        subplot(1,length(type),i);
-        colormap(flipud(gray))
-        imagesc(results(i).PAS(:,2))
-        set(gca,'xtick',1,'xticklabel',type{i})
-        ylabel('state feature');
-        prettyplot
-    end
-    suptitle('p(a|s) = exp[\theta]')
-end
-
-%% visualize weights
-% figure; subplot 121;
-% colormap(flipud(gray))
-% imagesc([results(1).w(end,:)' results(3).w(end,:)'])
-% set(gca,'xtick',[1:2],'xticklabel',type([1 3]))
-% ylabel('state feature')
-% subplot 122;
-% colormap(flipud(gray))
-% imagesc([results(2).w(end,:)' results(4).w(end,:)'])
-% set(gca,'xtick',[1:2],'xticklabel',type([2 4]))
-% title('state feature value weights')
-% subprettyplot(1,2)
-
-
-%% outcome and action rates over time
+%% outcome and action rates over time (Fig 2)
 win = 100; % # seconds moving window
 for i = 1:length(type)
-    results(i).outRate = sum(results(i).x==2)/timeSteps;
-    results(i).actRate = sum(results(i).a==2)/timeSteps;
+    results(i).outRate = sum(results(i).x(1:sched.trainEnd)==2)/sched.trainEnd;
+    results(i).actRate = sum(results(i).a(1:sched.trainEnd)==2)/sched.trainEnd;
+    results(i).value = mean(results(i).rho2(1:sched.trainEnd));
     
     % moving average
     results(i).movOutRate = movmean(results(i).x-1, win,'Endpoints','shrink');
     results(i).movActRate = movmean(results(i).a-1, win,'Endpoints','shrink');
     
     % moving avg reward (includes action cost)
-    results(i).avgRew = movmean(results(i).rho, win,'Endpoints','shrink');
+    results(i).avgRew = movmean(results(i).rho2, win,'Endpoints','shrink');
     
 end
 
 figure; hold on;
-subplot(3,4,1:3); hold on;
+subplot(6,4,1:3); hold on;
 for i = 1:length(type)
-    plot(results(i).movOutRate,'LineWidth',1.5)
+    plot(results(i).movOutRate(1:sched.trainEnd-win),'LineWidth',1.5)
 end
-plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
 prettyplot
 ylabel('outcome rate')
-legend([type 'devaluation'],'FontSize',15); legend('boxoff')
+legend([type 'devaluation' 'test'],'FontSize',15); legend('boxoff')
 
-subplot(3,4,5:7); hold on;
+subplot(6,4,5:7); hold on;
 for i = 1:length(type)
-    plot(results(i).movActRate,'LineWidth',1.5)
+    plot(results(i).movActRate(1:sched.trainEnd-win),'LineWidth',1.5)
 end
-xlabel('time (s)')
 ylabel('action rate')
-plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
 prettyplot
 
-subplot(3,4,4); hold on;
+subplot(6,4,4); hold on;
 for i = 1:length(type)
     bar(i,results(i).outRate);
 end
-legend(type); legend('boxoff')
 set(gca,'xtick',[1:4],'xticklabel',type)
 prettyplot
-subplot(3,4,8); hold on;
+
+subplot(6,4,8); hold on;
 for i = 1:length(type)
     bar(i,results(i).actRate);
 end
 set(gca,'xtick',[1:4],'xticklabel',type)
 prettyplot
 
-subplot(3,4,9:11); hold on;
+subplot(6,4,9:11); hold on;
 for i = 1:length(type)
-    plot(results(i).avgRew,'LineWidth',1.5)
+    plot(results(i).avgRew(1:sched.trainEnd-win),'LineWidth',1.5)
 end
-plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-xlabel('time (s)')
-ylabel('avg reward')
+%plot([sched.trainEnd sched.trainEnd],ylim,'k--','LineWidth',2)
+%plot([sched.devalEnd sched.devalEnd],ylim,'k.-','LineWidth',2)
+ylabel('V^\pi')
 prettyplot
 
-set(gcf, 'Position',  [300, 300, 800, 500])
+subplot(6,4,12); hold on;
+for i = 1:length(type)
+    bar(i,results(i).value);
+end
+set(gca,'xtick',[1:4],'xticklabel',type)
+prettyplot
 
+%% beta and policy cost (Fig 2)
+subplot(6,4,13:15); hold on;
+for i = 1:length(type)
+    plot(results(i).beta(1:sched.trainEnd-win),'LineWidth',1.5)
+end
+ylabel(' \beta')
+prettyplot
+
+subplot(6,4,17:19); hold on;
+for i = 1:length(type)
+    plot(results(i).ecost(1:sched.trainEnd-win),'LineWidth',1.5)
+end
+ylabel('E[C(\pi_\theta)]')
+prettyplot
+
+subplot(6,4,21:23);  hold on;
+for i = 1:length(type)
+    plot((1./results(i).beta(1:sched.trainEnd-win)).*results(i).ecost(1:sched.trainEnd-win),'LineWidth',1.5)
+end
+ylabel('\beta^{-1} E[C(\pi_\theta)]')
+xlabel('time (s)')
+prettyplot
+
+set(gcf, 'Position',  [100, 100, 800, 1000])
+
+%% decompose policy (Fig 3)
+% if i were to respond only based on the habit component vs the other
+
+figure; hold on;
+for i = 1:length(type)
+    subplot(4,1,i); hold on;
+    value_pi = 1./(1+exp(-(results(i).val(:,2) - results(i).val(:,1)))); plot(value_pi ,'b','LineWidth',2); % state-dep 
+    plot(results(i).pi_as(:,2),'k','LineWidth',2); % actual policy
+    habit_pi = 1./(1+exp(-(results(i).hab(:,2) - results(i).hab(:,1)))); plot(habit_pi ,'r','LineWidth',2); % habit
+    
+plot(results(i).pa(:,2) ,'g','LineWidth',2); % pa
+title(type{i})
+end
+ylabel('p(a=lever|s)')
+xlabel('time (s)')
+legend('state-dep. component','\pi(a|s)','habit component','pa')
+equalabscissa(4,1)
+subprettyplot(4,1)
+set(gcf, 'Position',  [300, 300, 600, 800])
+
+why
+%% RPE deconstructed
+% figure; hold on;
+% subplot 411; hold on; % rpe
+% for i = 1:length(type)
+%     plot(results(i).rpe(1:sched.trainEnd-win),'LineWidth',1.5)
+% end
+% ylabel('\delta')
+% prettyplot
+%
+% subplot 412; hold on; % r-rho
+% for i = 1:length(type)
+%     plot(results(i).r(1:sched.trainEnd-win)-results(i).rho(1:sched.trainEnd-win),'LineWidth',1.5)
+% end
+% ylabel('r-\rho')
+% prettyplot
+%
+% subplot 413; hold on; % V(s')-V(s)
+% for i = 1:length(type)
+%     plot(results(i).VS(1:sched.trainEnd-win),'LineWidth',1.5)
+% end
+% ylabel('V(s`)-V(s)')
+% prettyplot
+%
+% subplot 414; hold on; % 1\beta*cost
+% for i = 1:length(type)
+%     plot((1./results(i).beta(1:sched.trainEnd-win)).*results(i).ecost(1:sched.trainEnd-win),'LineWidth',1.5)
+% end
+% ylabel('\beta^{-1} E[C(\pi_\theta)]')
+% xlabel('time (s)')
+% prettyplot
+%
+% set(gcf, 'Position',  [100, 100, 800, 1000])
+
+
+%% plot pas over time
+
+% for i = 1:length(type)
+%     figure; hold on;
+%     subplot 311; hold on;
+%     imagesc(squeeze(results(i).pas(:,2,:)))
+%     colormap(flipud(gray))
+%     set(gca,'YDir','reverse')
+%     subplot 312; hold on;
+%     plot(results(i).rpe)
+%     subplot 313; hold on;
+%     imagesc(results(i).w')
+% end
+
+
+%% action rate before and after devaluation (Fig 4)
+if sched.deval==1
+    
+    figure; subplot 131; hold on;
+    for i = 1:length(type)
+        preDevalRate(i) = sum(results(i).a(sched.trainEnd-sched.testWin:sched.trainEnd)==2)/sched.testWin;
+        postDevalRate(i) = sum(results(i).a(sched.devalEnd+1:end)==2)/sched.testWin;
+        
+        b = bar(i,[preDevalRate(i) postDevalRate(i)],'FaceColor',map(i,:));
+        b(2).FaceColor = [1 1 1];
+        b(2).EdgeColor = map(i,:);
+        b(2).LineWidth = 2;
+        
+    end
+    ylabel('action (press) rate')
+    legend('before','after','FontSize',15,'Location','NorthWest'); legend('boxoff')
+    set(gca,'xtick',[1:4],'xticklabel',type)
+    
+    
+    subplot 132; hold on; % change in action rate
+    % change in action rate
+    for i = 1:length(type)
+        results(i).devalScore = preDevalRate(i)-postDevalRate(i);
+        bar(i,results(i).devalScore,'FaceColor',map(i,:));
+        
+    end
+    ylabel('\Delta press rate (pre-post)')
+    axis([0 5 0 0.5])
+    set(gca,'xtick',[1:4],'xticklabel',type)
+    
+    % beta at time of deval vs deval score
+    
+    %% beta relationship with deval score
+    subplot 133; hold on;
+    for i = 1:length(type)
+        plot(mean(results(i).beta(sched.trainEnd-sched.testWin:sched.trainEnd)),results(i).devalScore,'.','Color',map(i,:),'MarkerSize',30);
+    end
+    xlabel('\beta')
+    ylabel('\Delta press rate (pre-post)')
+    prettyplot
+    
+    subprettyplot(1,3)
+    set(gcf, 'Position',  [300, 300, 800, 300])
+end
+
+typCol = {'Blues','Greens','Reds','YlOrBr'};
+
+%% moving plot of beta and policy cost/rho (Fig 5)
+figure; hold on;
+for i = 1:length(type)
+    %subplot 211; hold on; axis([0 max(results(i).ecost(1:sched.trainEnd)) 0 max(results(i).rho(1:sched.trainEnd))])
+    %subplot 212; hold on; axis([0 sched.trainEnd 0 max(results(i).beta(1:sched.trainEnd))])
+    subplot 211; hold on;
+    scatter(results(i).ecost(1:sched.trainEnd),results(i).rho2(1:sched.trainEnd), 20, brewermap(sched.trainEnd,typCol{i}), 'filled');
+    
+    subplot 212; hold on;
+    scatter(1:sched.trainEnd,results(i).beta(1:sched.trainEnd), 20, brewermap(sched.trainEnd,typCol{i}), 'filled');
+    colormap(brewermap(sched.trainEnd,typCol{i}))
+end
+subplot 211;
+legend(h,type)
+xlabel('policy cost C(\pi)')
+ylabel('avg reward V^\pi')
+title('reward-complexity during learning')
+
+subplot 212; hold on;
+xlabel('time (s)')
+ylabel('\beta')
+title('\beta over time')
+% plot cost and beta at end of learning
+subplot 211; hold on;
+for i = 1:length(type)
+    h(i,:) = plot(results(i).ecost(sched.trainEnd),results(i).rho2(sched.trainEnd),'o','MarkerFaceColor',map(i,:),'MarkerSize',20,'MarkerEdgeColor',[1 1 1]);
+end
+legend(h,type)
+set(gcf, 'Position',  [400, 300, 500, 600])
+subprettyplot(2,1)
 
 %% diagnostics
 if diagn ==1
@@ -305,7 +422,7 @@ if diagn ==1
         subplot 425; hold on; plot(results(i).NA.nonrew,results(i).RPE.nonrew,'r.'); plot(results(i).NA.rew,results(i).RPE.rew,'g.'); ylabel('RPE \delta')
         subplot 426; hold on; plot(results(i).NT.nonrew,results(i).RPE.nonrew,'r.'); plot(results(i).NT.rew,results(i).RPE.rew,'g.');
         subplot 427; hold on; plot(results(i).VS,results(i).RPE.nonrew,'r.'); plot(results(i).VS,results(i).RPE.rew,'g.');title('V(s`)-V(s)');
-        subplot 428; hold on; plot((1./results(i).beta).*results(i).cost,results(i).RPE.nonrew,'r.'); plot((1./results(i).beta).*results(i).cost,results(i).RPE.rew,'g.'); title('\beta^{-1} C(\pi)');
+        subplot 428; hold on; plot((1./results(i).beta).*results(i).ecost,results(i).RPE.nonrew,'r.'); plot((1./results(i).beta).*results(i).ecost,results(i).RPE.rew,'g.'); title('\beta^{-1} C(\pi)');
         subprettyplot(4,2)
         suptitle(type{i})
         
@@ -313,268 +430,273 @@ if diagn ==1
 end
 
 
-%% beta and policy cost
-figure; hold on;
-subplot 311; hold on;
-for i = 1:length(type)
-    plot(results(i).beta,'LineWidth',1.5)
-end
-plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-ylabel(' \beta')
-legend([type 'devaluation'],'FontSize',15); legend('boxoff')
-
-subplot 312; hold on;
-for i = 1:length(type)
-    plot(movmean(results(i).cost,500,'Endpoints','shrink'),'LineWidth',1.5)
-end
-plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-ylabel('policy cost C(\pi_\theta)')
-
-subplot 313; hold on;
-
-for i = 1:length(type)
-    plot(movmean(results(i).mi, 500),'LineWidth',1.5)
-end
-plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-ylabel('I(S;A)')
-xlabel('time (s)')
-prettyplot
-
+%% plot pas over time
 % for i = 1:length(type)
-%     plot(movmean((1./results(i).beta).* results(i).cost', win,'Endpoints','shrink'),'LineWidth',1.5)
+%     figure; hold on;
+%     subplot 311; hold on;
+%     imagesc(squeeze(results(i).pas(:,2,:)))
+%     colormap(flipud(gray))
+%     set(gca,'YDir','reverse')
+%     subplot 312; hold on;
+%     plot(results(i).rpe)
+%     subplot 313; hold on;
+%     imagesc(results(i).w')
 % end
-% plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-% ylabel('\beta^{-1} C(\pi_\theta)')
 
-subprettyplot(3,1)
-
-set(gcf, 'Position',  [300, 300, 700, 500])
-
-
-%% mutual information and log(pa) vs beta(theta*phi)
-% figure;
-% subplot 311; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).cost, 500),'LineWidth',1.5)
-% end
-% plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-% ylabel('policy cost')
-% xlabel('time (s)')
-% prettyplot
-%
-% subplot 312; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).mi, 500),'LineWidth',1.5)
-% end
-% plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-% ylabel('I(S;A)')
-% xlabel('time (s)')
-% prettyplot
-
-%% action rate before and after devaluation
-if sched.devalTime ~= timeSteps
-    devalWin = timeSteps-sched.devalTime;
+%% probability of action (learned policy weights BEFORE devaluation) (Fig 6)
+if sched.deval == 1
+    if length(type) == 4 % if doing all 4 schedules at once
+        figure; subplot 211;
+        colormap(flipud(gray))
+        imagesc([results(1).pas(:,2,sched.trainEnd) results(2).pas(:,2,sched.trainEnd) results(3).pas(:,2,sched.trainEnd) results(4).pas(:,2,sched.trainEnd)])
+        caxis([0 1])
+        set(gca,'xtick',[1:4],'xticklabel',type)
+        ylabel('state feature')
+        colorbar
+        title('policy weights before deval, exp(\theta)')
+    else
+        figure; hold on; subplot 211;
+        for i = 1:length(type)
+            subplot(1,length(type),i);
+            colormap(flipud(gray))
+            imagesc(results(i).pas(:,2,sched.trainEnd))
+            set(gca,'xtick',1,'xticklabel',type{i})
+            ylabel('state feature');
+            prettyplot
+        end
+        title('policy weights before deval, exp(\theta)')
+    end
     
-    figure; subplot 121; hold on;
+    %% probability of action (learned policy weights at the END OF TEST)
+    if length(type) == 4 % if doing all 4 schedules at once
+        subplot 212;
+        colormap(flipud(gray))
+        imagesc([results(1).pas(:,2,end) results(2).pas(:,2,end) results(3).pas(:,2,end) results(4).pas(:,2,end)])
+        caxis([0 1])
+        set(gca,'xtick',[1:4],'xticklabel',type)
+        ylabel('state feature')
+        colorbar
+        subprettyplot(2,1)
+        title('policy weights at end of test, exp(\theta)')
+    else
+        subplot 212;
+        for i = 1:length(type)
+            subplot(1,length(type),i);
+            colormap(flipud(gray))
+            imagesc(results(i).pas(:,2,end))
+            set(gca,'xtick',1,'xticklabel',type{i})
+            ylabel('state feature');
+            prettyplot
+        end
+        title('policy weights at end of test, exp(\theta)')
+    end
+    set(gcf, 'Position',  [600, 300, 500, 800])
+    
+    % analyze difference in weights
     for i = 1:length(type)
-        b = bar(i,[sum(results(i).a(sched.devalTime-devalWin:sched.devalTime)-1)/devalWin sum(results(i).a(sched.devalTime+1:end)-1)/devalWin],'FaceColor',map(i,:));
-        b(2).FaceColor = [1 1 1];
-        b(2).EdgeColor = map(i,:);
-        b(2).LineWidth = 2;
+        results(i).preDevalTheta = results(i).pas(:,:,sched.trainEnd);
+        results(i).postDevalTheta = results(i).pas(:,:,sched.devalEnd);
+        results(i).postTestTheta = results(i).pas(:,:,end);
+        results(i).endTheta = results(i).pas(:,:,end);
+        results(i).devalDiff = results(i).postDevalTheta - results(i).preDevalTheta; % post - pre, if this is positive, it means that theta has increased for that action
+        results(i).testDiff = results(i).postTestTheta - results(i).preDevalTheta; % postTest - pre
         
     end
-    ylabel('action (press) rate')
-    legend('before','after','FontSize',15,'Location','NorthWest'); legend('boxoff')
-    set(gca,'xtick',[1:4],'xticklabel',type)
+    %% average across state features (Fig 7)
+    % plot change in theta
+    figure; % subplot 411;
+    %imagesc([results(1).devalDiff(:,1) (results(2).devalDiff(:,1)) (results(3).devalDiff(:,1)) (results(4).devalDiff(:,1))])
+    subplot 211; bar([sum(results(1).devalDiff(:,1)) sum(results(2).devalDiff(:,1))  sum(results(3).devalDiff(:,1)) sum(results(4).devalDiff(:,1))])
+    ylabel('post-preDeval \Delta \theta(~press)'); % positive means
+    set(gca,'xtick',1:4,'xticklabel',type)
+    %subplot 413;
+    %imagesc([results(1).testDiff(:,1) (results(2).testDiff(:,1)) (results(3).testDiff(:,1)) (results(4).testDiff(:,1))])
+    subplot 212; bar([sum(results(1).testDiff(:,1)) sum(results(2).testDiff(:,1))  sum(results(3).testDiff(:,1)) sum(results(4).testDiff(:,1))])
+    ylabel('postTest-preDeval \Delta \theta(~press)'); % positive means
+    subprettyplot(2,1)
+    set(gcf, 'Position',  [500, 200, 500, 600])
+    set(gca,'xtick',1:4,'xticklabel',type)
     
-    
-    subplot 122; hold on; % change in action rate
-    % change in action rate
-    for i = 1:length(type)
-        results(i).devalScore = sum(results(i).a(sched.devalTime-devalWin:sched.devalTime)-1)/devalWin - sum(results(i).a(sched.devalTime+1:end)-1)/devalWin;
-        bar(i,results(i).devalScore,'FaceColor',map(i,:));
+    %% beta duration satiation (Fig 8)
+    % from trainEnd to devalEnd
+%     figure; hold on; subplot 231; hold on;
+%     for i = 1:length(type)
+%         plot(results(i).rpe(sched.trainEnd+1:sched.devalEnd-1))
+%     end
+%     prettyplot
+%     ylabel('\delta_t RPE')
+%     xlabel('satiation period (s)')
+%     
+%     subplot 232; hold on;
+%     for i = 1:length(type)
+%         plot(results(i).r(sched.trainEnd+1:sched.devalEnd-1)-results(i).rho(sched.trainEnd+1:sched.devalEnd-1))
+%     end
+%     prettyplot
+%     ylabel('r-\rho')
+%     xlabel('satiation period (s)')
+%     
+%     subplot 233; hold on;
+%     for i = 1:length(type)
+%         plot((1./results(i).beta(sched.trainEnd+1:sched.devalEnd-1)).*results(i).ecost(sched.trainEnd+1:sched.devalEnd-1))
+%     end
+%     prettyplot
+%     ylabel('\beta^{-1}*E[C(\pi)]')
+%     xlabel('satiation period (s)')
+%     % plot the RPEs before and after devaluation to show that
+%     % in FR/FI, since beta is high, the (r - 1/beta * C) should be higher and
+%     % should increase theta(not press) more than in VR/VI where beta is low, so
+%     % 1/beta * C is big a
+%     
+%     % need 1/beta*C to also be higher in VR/VI > FR/FI
+%     
+%     % also, the longer you train, the more policy weights increase, more beta
+%     % increases..
+%     
+%     % from devalEnd to end
+%     subplot 234; hold on;
+%     for i = 1:length(type)
+%         plot(results(i).rpe(sched.devalEnd:end))
+%     end
+%     prettyplot
+%     ylabel('\delta_t RPE')
+%     xlabel('test period (s)')
+%     
+%     subplot 235; hold on;
+%     for i = 1:length(type)
+%         plot(results(i).r(sched.devalEnd:end)-results(i).rho(sched.devalEnd:end))
+%     end
+%     prettyplot
+%     ylabel('r-\rho')
+%     xlabel('test period (s)')
+%     
+%     subplot 236; hold on;
+%     for i = 1:length(type)
+%         plot((1./results(i).beta(sched.devalEnd:end)).*results(i).ecost(sched.devalEnd:end))
+%     end
+%     prettyplot
+%     ylabel('\beta^{-1}*E[C(\pi)]')
+%     xlabel('test period (s)')
+%     
+%     set(gcf, 'Position',  [200, 200, 800, 500])
+%     
+else
+    %% probability of action (learned policy weights)
+    if length(type) == 4 % if doing all 4 schedules at once
+        figure;
+        colormap(flipud(gray))
+        imagesc([results(1).pas(:,2,end) results(2).pas(:,2,end) results(3).pas(:,2,end) results(4).pas(:,2,end)])
+        caxis([0 1])
+        set(gca,'xtick',[1:4],'xticklabel',type)
+        ylabel('state feature')
+        title('policy weights, exp(\theta)')
+        prettyplot
+        colorbar
+    else
+        figure; hold on;
+        for i = 1:length(type)
+            subplot(1,length(type),i);
+            colormap(flipud(gray))
+            imagesc(results(i).pas(:,2,end))
+            caxis([0 1])
+            set(gca,'xtick',1,'xticklabel',type{i})
+            ylabel('state feature');
+            prettyplot
+        end
+        suptitle('policy weights, exp(\theta)')
     end
-    ylabel('devaluation score (pre-post)')
-    axis([0 5 0 0.5])
-    set(gca,'xtick',[1:4],'xticklabel',type)
-    
-    % beta at time of deval vs deval score
-    subprettyplot(1,2)
-    set(gcf, 'Position',  [300, 300, 800, 300])
-    
-    %% beta relationship with deval score
-    figure(100); subplot 121;hold on;
-    for i = 1:length(type)
-        plot(mean(results(i).beta(sched.devalTime-win:sched.devalTime)),results(i).devalScore,'.','Color',map(i,:),'MarkerSize',30);
-    end
-    xlabel('\beta')
-    ylabel('devaluation score')
-    prettyplot
 end
 
 
-%% relationship between a changing beta and a changing policy complexity
-
-% moving est of mutual information
-for i = 1:length(type)
-    results(i).movMI = movmean(results(i).mi, win,'Endpoints','shrink');
-    results(i).movCost = movmean(results(i).cost,win,'Endpoints','shrink');
-    results(i).movRew = movmean(results(i).rho,win,'Endpoints','shrink');
-    results(i).movBeta = movmean(results(i).beta,win,'Endpoints','shrink');
-    results(i).estBeta = gradient(results(i).movCost)./gradient(results(i).movRew);
-end
-
-% what is relationship between changing beta and a changing policy complexity
-% does beta predict the policy complexity? --> YES, the bigger the beta,
-% the bigger the policy complexity is allowed to be
-
-% if dbeta is 0, v changes w I the same
-% if dbeta is big, policy cost changes a lot (there's a lot of room to move) for the same reward
-
-%% estimated mutual information (at end of learning)
-
-% figure; hold on; subplot 131; hold on;
-% num = 1000;
-% for i = 1:length(type)
-%     bar(i,mean(results(i).cost(end-num:end)),'FaceColor',map(i,:));
-% end
+%% visualize weights (Fig 9)
+% figure;
+% colormap(flipud(gray))
+% imagesc([results(1).w(end,:)' results(2).w(end,:)' results(3).w(end,:)' results(4).w(end,:)'])
 % set(gca,'xtick',[1:4],'xticklabel',type)
-% ylabel('policy cost C(\pi_\theta)')
+% ylabel('state feature');
 % prettyplot
-%
-% subplot 132; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movBeta,results(i).movCost,'.','Color',map(i,:),'MarkerSize',20 )
-% end
-% xlabel('\beta')
-% ylabel('C(\pi_\theta)')
-% prettyplot
-%
-% subplot 133; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movCost,results(i).movRew,'.','Color',map(i,:),'MarkerSize',20 )
-% end
-% xlabel('C(\pi_\theta)')
-% ylabel('reward')
-% prettyplot
-% set(gcf, 'Position',  [300, 300, 1000, 300])
+% title('state feature value weights'); colorbar
 
 
-%% MI (action = press)
-
+%% policy / state weights over time (Fig 01)
+% % bias weight (theta tap - theta not tap)
 % figure; hold on;
 % for i = 1:length(type)
-%     bar(i,mean(results(i).mi(end-num:end)),'FaceColor',map(i,:));
+%     subplot(2,4,i); hold on;
+%     plot(results(i).w(:,1),'r')
+%     %plot(results(i).w(:,2:end),'b')
+%     plot(sum(results(i).w(:,2:end),2),'b')
+%     plot([sched.trainEnd sched.trainEnd],ylim,'k--','LineWidth',2)
+%     plot([sched.devalEnd sched.devalEnd],ylim,'k.-','LineWidth',2)
+%     title(type{i})
 % end
-% set(gca,'xtick',[1:4],'xticklabel',type)
-% ylabel('mutual information I(S;A)')
-% prettyplot
-%
-%
-% figure; hold on;
+% subplot(2,4,1); hold on;
+% ylabel('state value')
+% 
 % for i = 1:length(type)
-%     plot(results(i).mi,'Color',map(i,:));
-%     plot(results(i).rho,'Color',map(i,:));
+%     subplot(2,4,i+4); hold on;
+%     plot(squeeze(results(i).theta(1,2,:)-results(i).theta(1,1,:)),'r');
+%     %plot(squeeze(results(i).theta(2:end,2,:)-results(i).theta(2:end,1,:))','b');
+%     plot(squeeze(sum(results(i).theta(2:end,2,:))-sum(results(i).theta(2:end,1,:)))','b');
+%     plot([sched.trainEnd sched.trainEnd],ylim,'k--','LineWidth',2)
+%     plot([sched.devalEnd sched.devalEnd],ylim,'k.-','LineWidth',2)
 % end
-% set(gca,'xtick',[1:4],'xticklabel',type)
-% ylabel('mutual information I(S;A)')
-% prettyplot
-
-
-% %% rho and rpe
-% figure; hold on; subplot 221; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).rho,win,'Endpoints','shrink'),'LineWidth',1.5);
-% end
-%
-% ylabel('avg rew')
-% prettyplot
-%
-% subplot 222; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).rpe,win,'Endpoints','shrink'),'LineWidth',1.5);
-% end
-% xlabel('time(s)')
-% ylabel('\delta')
-% prettyplot
-%
-% subplot 223; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movCost,results(i).movRew,'.');
-% end
-%
-% subplot 224; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movMI,results(i).movRew,'.');
-% end
-%
-% %% instantaneous contingency
-% figure; hold on; subplot 121; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).cont,win,'Endpoints','shrink'),'LineWidth',2);
-% end
-%
-% ylabel('contingency')
+% legend('habit component','state-dep. component')
+% subplot(2,4,5); hold on;
+% ylabel('\theta(press)-\theta(~press)')
 % xlabel('time (s)')
-% prettyplot
-%
-% % contingency and press rate
-% subplot 122; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movActRate,movmean(results(i).cont,win,'Endpoints','shrink'),'.');
-% end
-% ylabel('contingency')
-% xlabel('action rate \lambda_a')
-% prettyplot
-%
-% figure(300); subplot 122;hold on;
-%
-% for i = 1:length(type)
-%     plot(mean(results(i).cost(sched.devalTime-win:sched.devalTime)), mean(results(i).rho(sched.devalTime-win:sched.devalTime)),'.','Color',map(i,:),'MarkerSize',30 )
-% end
-% xlabel('policy complexity')
-% ylabel('average reward')
-% prettyplot
+% subprettyplot(2,4)
 end
 
 
 
 function makePlotsSess(results, sched, type)
-dvlen = 300; % length of devaluation session
 map = habitColors;
-
 
 %% data
 load('all_data_cleaned.mat') % actual data
+
+% format of test is: # rates x [val deval] columns , converted to actions
+% per second
 FI45.test = FI45.test./60;
 VI45.test = VI45.test./60;
+FR20.test = FR20.test./60;
+VR20.test = VR20.test./60;
+
+if sched.type=='FR'
+    data = FR20;
+    col = map(1,:);
+elseif sched.type=='VR'
+    data = VR20;
+    col = map(2,:);
+elseif sched.type=='FI'
+    data = FI45;
+    col = map(3,:);
+elseif sched.type=='VI'
+    data = VI45;
+    col = map(4,:);
+end
 
 %% outcome and action rates over time
-win = 200; % # seconds moving window
+win = 100; % # seconds moving window
 sess = size(results(1).sess,2); % get number of sessions
 for i = 1:length(results) % for each subject
     for s = 1:sess % for each session
         if ismember(s,sched.devalsess)
-            results(i).sess(s).timeSteps = size(results(i).sess(s).a,2); % session length, timesteps;
-            timeSteps = results(i).sess(s).timeSteps;
-            devalTime = results(i).sess(s).timeSteps - dvlen;
-            results(i).sess(s).outRate = sum(results(i).sess(s).x(1:devalTime)==2)/devalTime;
-            results(i).sess(s).actRate = sum(results(i).sess(s).a(1:devalTime)==2)/devalTime;
-            results(i).sess(s).avgRew = mean(results(i).sess(s).rho(1:devalTime));
-            results(i).sess(s).beta = mean(results(i).sess(s).beta(1:devalTime));
-            results(i).sess(s).postTestRate = sum(results(i).sess(s).a(devalTime:end)==2)/dvlen;
-            results(i).sess(s).preTestRate = sum(results(i).sess(s).a(devalTime-dvlen:devalTime)==2)/dvlen;
-            
+            %results(i).sess(s).timeSteps = size(results(i).sess(s).a,2); % session length, timesteps;
+            results(i).sess(s).outRate = sum(results(i).sess(s).x(1:sched.devalEnd)==2)/sched.devalEnd;
+            results(i).sess(s).actRate = sum(results(i).sess(s).a(1:sched.devalEnd)==2)/sched.devalEnd;
+            results(i).sess(s).avgRew = mean(results(i).sess(s).rho(1:sched.devalEnd));
+            results(i).sess(s).avgBeta = mean(results(i).sess(s).beta(1:sched.devalEnd));
+            results(i).sess(s).postTestRate = sum(results(i).sess(s).a(sched.devalEnd:end)==2)/sched.testWin;
+            results(i).sess(s).preTestRate = sum(results(i).sess(s).a(sched.trainEnd-sched.testWin:sched.trainEnd)==2)/sched.testWin;
         else
             results(i).sess(s).timeSteps = size(results(i).sess(s).a,2); % session length, timesteps;
             timeSteps = results(i).sess(s).timeSteps;
-            results(i).sess(s).outRate = sum(results(i).sess(s).x==2)/timeSteps;
-            results(i).sess(s).actRate = sum(results(i).sess(s).a==2)/timeSteps;
+            results(i).sess(s).outRate = sum(results(i).sess(s).x==2)/sched.trainEnd;
+            results(i).sess(s).actRate = sum(results(i).sess(s).a==2)/sched.trainEnd;
             results(i).sess(s).avgRew = mean(results(i).sess(s).rho);
-            results(i).sess(s).beta = mean(results(i).sess(s).beta);
-            
+            results(i).sess(s).avgBeta = mean(results(i).sess(s).beta);
         end
-        
     end
 end
 
@@ -582,22 +704,21 @@ end
 figure; hold on;
 subplot 311; hold on;
 for i = 1:length(results)
-    outRate(i,:) = cat(2,results(i).sess.actRate);
+    outRate(i,:) = cat(2,results(i).sess.outRate);
 end
-h(1,:) = errorbar(mean(outRate),sem(outRate,1),'LineWidth',2,'Color',map(4,:));
+errorbar(mean(outRate),sem(outRate,1),'LineWidth',2,'Color',col);
 prettyplot
 ylabel('outcome rate')
 legend([type],'FontSize',15); legend('boxoff')
 axis([0 22 0 1])
-plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--') %
+plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--')
 
 subplot 312; hold on;
 for i = 1:length(results)
     actRate(i,:) = cat(2,results(i).sess.actRate);
 end
-h(1,:) = errorbar(mean(actRate),sem(actRate,1),'LineWidth',2,'Color',map(4,:));
-%errorbar(mean(FI45.actRate),sem(FI45.actRate,1),'LineWidth',2,'Color',[0 0 0]);
-errorbar(mean(VI45.actRate),sem(VI45.actRate,1),'LineWidth',2,'Color',[0 0 0]); % data RI
+errorbar(mean(data.actRate),sem(data.actRate,1),'LineWidth',2,'Color',[0 0 0]);
+errorbar(mean(actRate),sem(actRate,1),'LineWidth',2,'Color',col);
 xlabel('session #')
 ylabel('action rate')
 axis([0 22 0 1])
@@ -606,9 +727,9 @@ prettyplot
 
 subplot 313;  hold on;
 for i = 1:length(results)
-    beta(i,:) = cat(2,results(i).sess.beta);
+    beta(i,:) = cat(2,results(i).sess.avgBeta);
 end
-h(1,:) = errorbar(mean(beta),sem(beta,1),'LineWidth',2,'Color',map(4,:));
+errorbar(mean(beta),sem(beta,1),'LineWidth',2,'Color',col);
 axis([0 22 ylim])
 xlabel('session #')
 ylabel('\beta')
@@ -616,31 +737,31 @@ prettyplot
 
 set(gcf, 'Position',  [300, 300, 800, 500])
 
+%% devaluation
 for d = 1:3
     for i = 1:length(results)
-        test(i,:,d) = [results(i).sess([sched.devalsess(d)]).preTestRate results(i).sess([sched.devalsess(d)]).postTestRate]
-        %deval(i,:,d) = cat(2,results(i).sess([sched.devalsess(d)]).preTestRate);
-        %val(i,:,d) = cat(2,results(i).sess([sched.devalsess(d)]).postTestRate);
+        test(i,:,d) = [results(i).sess([sched.devalsess(d)]).preTestRate results(i).sess([sched.devalsess(d)]).postTestRate];
     end
 end
+
 figure; hold on;
 for d = 1:3
     subplot 121; hold on;
-    [b e] = barwitherr(sem(VI45.test(:,:,d),1),d, mean(VI45.test(:,:,d)),'FaceColor',[0 0 0]);
+    [b e] = barwitherr(sem(data.test(:,:,d),1),d, mean(data.test(:,:,d)),'FaceColor',[0 0 0]);
     b(2).FaceColor = [1 1 1];
     b(2).EdgeColor = [0 0 0];
     b(2).LineWidth = 2;
     e.Color = [0 0 0];
     e.LineWidth = 2;
     
-    title('data')
+    title(strcat('data - ',sched.type))
     
     subplot 122; hold on;
-    [b e] = barwitherr(sem(test(:,:,d),1),d, mean(test(:,:,d)),'FaceColor',map(4,:));
+    [b e] = barwitherr(sem(test(:,:,d),1),d, mean(test(:,:,d)),'FaceColor',col);
     b(2).FaceColor = [1 1 1];
-    b(2).EdgeColor = map(4,:);
+    b(2).EdgeColor = col;
     b(2).LineWidth = 2;
-    e.Color = map(4,:);
+    e.Color = col;
     e.LineWidth = 2;
     
     title('model')
@@ -648,206 +769,93 @@ end
 subprettyplot(1,2)
 
 
-for i = 1:length(results)
-    mR = [];
-    for s = 1:sess
-        mR = [mR movmean(results(i).sess(s).a(1:2290)==2,200)];
-    end
-    moveAR(i,:) = mR;
-    clear mR
-end
-figure; plot(moveAR')
+why
 
-
-
-%% beta and policy cost
-figure; hold on;
-subplot 211; hold on;
-for i = 1:length(type)
-    %h(i,:) = shadedErrorBar(1:timeSteps,mean(cat(1, results(i,:).beta)), std(cat(1, results(i,:).beta)),{'LineWidth',1.5,'Color',map(i,:)},1);
-    plot(movmean(cat(2, results(i,:).beta),500,'Endpoints','shrink'),'LineWidth',1.5);
-end
-%plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-ylabel(' \beta')
-legend([type 'devaluation'],'FontSize',15); legend('boxoff')
-
-subplot 212; hold on;
-for i = 1:length(type)
-    %shadedErrorBar(1:timeSteps,mean(movmean(cat(2,results(i,:).cost),500,'Endpoints','shrink')'),std(movmean(cat(2, results(i,:).cost),500,'Endpoints','shrink')'),{'LineWidth',1.5,'Color',map(i,:)},1);
-    plot(movmean(cat(2,results(i,:).cost),500,'Endpoints','shrink'),'LineWidth',1.5);
-end
-%plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-ylabel('policy cost C(\pi_\theta)')
-
-subprettyplot(2,1)
-set(gcf, 'Position',  [300, 300, 700, 500])
-
-
-%% action rate before and after devaluation (avg over many iters)
-if sched.devalTime ~= timeSteps
-    devalWin = timeSteps-sched.devalTime;
-    
-    figure; subplot 121; hold on;
-    for i = 1:length(type)
-        all_a = cat(1,results(i,:).a);
-        pre_deval = sum(sum(all_a(:,sched.devalTime-devalWin:sched.devalTime)==2))/(devalWin*size(results,2));
-        post_deval =  sum(sum(all_a(:,sched.devalTime+1:end)==2))/(devalWin*size(results,2));
-        b = bar(i,[pre_deval post_deval],'FaceColor',map(i,:));
-        b(2).FaceColor = [1 1 1];
-        b(2).EdgeColor = map(i,:);
-        b(2).LineWidth = 2;
-        
-        results(i).devalScore = pre_deval - post_deval;
-    end
-    ylabel('action (press) rate')
-    legend('before','after','FontSize',15,'Location','NorthWest'); legend('boxoff')
-    set(gca,'xtick',[1:4],'xticklabel',type)
-    
-    
-    subplot 122; hold on; % change in action rate
-    for i = 1:length(type)
-        bar(i,results(i).devalScore,'FaceColor',map(i,:));
-    end
-    ylabel('devaluation score (pre-post)')
-    axis([0 5 0 0.5])
-    set(gca,'xtick',[1:4],'xticklabel',type)
-    
-    subprettyplot(1,2)
-    
-    set(gcf, 'Position',  [300, 300, 800, 300])
-    
-    %% beta relationship with deval score
-    
-    figure(100); subplot 121;hold on;
-    for i = 1:length(type)
-        plot(mean(results(i).beta(sched.devalTime-win:sched.devalTime)),results(i).devalScore,'.','Color',map(i,:),'MarkerSize',30);
-    end
-    xlabel('\beta')
-    ylabel('devaluation score')
-    prettyplot
-end
-
-
-%% relationship between a changing beta and a changing policy complexity
-
-% moving est of mutual information
-for i = 1:length(type)
-    results(i).movMI = movmean(results(i).mi, win,'Endpoints','shrink');
-    results(i).movCost = movmean(results(i).cost,win,'Endpoints','shrink');
-    results(i).movRew = movmean(results(i).rho,win,'Endpoints','shrink');
-    results(i).movBeta = movmean(results(i).beta,win,'Endpoints','shrink');
-    results(i).estBeta = gradient(results(i).movCost)./gradient(results(i).movRew);
-end
-
-% what is relationship between changing beta and a changing policy complexity
-% does beta predict the policy complexity? --> YES, the bigger the beta,
-% the bigger the policy complexity is allowed to be
-
-% if dbeta is 0, v changes w I the same
-% if dbeta is big, policy cost changes a lot (there's a lot of room to move) for the same reward
-
-%% estimated mutual information (at end of learning)
-
-% figure; hold on; subplot 131; hold on;
-% num = 1000;
+%
+% %% beta and policy cost
+% figure; hold on;
+% subplot 211; hold on;
 % for i = 1:length(type)
-%     bar(i,mean(results(i).cost(end-num:end)),'FaceColor',map(i,:));
+%     %h(i,:) = shadedErrorBar(1:timeSteps,mean(cat(1, results(i,:).beta)), std(cat(1, results(i,:).beta)),{'LineWidth',1.5,'Color',map(i,:)},1);
+%     plot(movmean(cat(2, results(i,:).beta),500,'Endpoints','shrink'),'LineWidth',1.5);
 % end
-% set(gca,'xtick',[1:4],'xticklabel',type)
+% %plot([sched.devalEnd sched.devalEnd],ylim,'k--','LineWidth',2)
+% ylabel(' \beta')
+% legend([type 'devaluation'],'FontSize',15); legend('boxoff')
+%
+% subplot 212; hold on;
+% for i = 1:length(type)
+%     %shadedErrorBar(1:timeSteps,mean(movmean(cat(2,results(i,:).cost),500,'Endpoints','shrink')'),std(movmean(cat(2, results(i,:).cost),500,'Endpoints','shrink')'),{'LineWidth',1.5,'Color',map(i,:)},1);
+%     plot(movmean(cat(2,results(i,:).cost),500,'Endpoints','shrink'),'LineWidth',1.5);
+% end
+% %plot([sched.devalEnd sched.devalEnd],ylim,'k--','LineWidth',2)
 % ylabel('policy cost C(\pi_\theta)')
-% prettyplot
 %
-% subplot 132; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movBeta,results(i).movCost,'.','Color',map(i,:),'MarkerSize',20 )
-% end
-% xlabel('\beta')
-% ylabel('C(\pi_\theta)')
-% prettyplot
+% subprettyplot(2,1)
+% set(gcf, 'Position',  [300, 300, 700, 500])
 %
-% subplot 133; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movCost,results(i).movRew,'.','Color',map(i,:),'MarkerSize',20 )
+%
+% %% action rate before and after devaluation (avg over many iters)
+% if sched.devalEnd ~= timeSteps
+%     testWin = timeSteps-sched.devalEnd;
+%
+%     figure; subplot 121; hold on;
+%     for i = 1:length(type)
+%         all_a = cat(1,results(i,:).a);
+%         pre_deval = sum(sum(all_a(:,sched.devalEnd-testWin:sched.devalEnd)==2))/(testWin*size(results,2));
+%         post_deval =  sum(sum(all_a(:,sched.devalEnd+1:end)==2))/(testWin*size(results,2));
+%         b = bar(i,[pre_deval post_deval],'FaceColor',map(i,:));
+%         b(2).FaceColor = [1 1 1];
+%         b(2).EdgeColor = map(i,:);
+%         b(2).LineWidth = 2;
+%
+%         results(i).devalScore = pre_deval - post_deval;
+%     end
+%     ylabel('action (press) rate')
+%     legend('before','after','FontSize',15,'Location','NorthWest'); legend('boxoff')
+%     set(gca,'xtick',[1:4],'xticklabel',type)
+%
+%
+%     subplot 122; hold on; % change in action rate
+%     for i = 1:length(type)
+%         bar(i,results(i).devalScore,'FaceColor',map(i,:));
+%     end
+%     ylabel('devaluation score (pre-post)')
+%     axis([0 5 0 0.5])
+%     set(gca,'xtick',[1:4],'xticklabel',type)
+%
+%     subprettyplot(1,2)
+%
+%     set(gcf, 'Position',  [300, 300, 800, 300])
+%
+%     %% beta relationship with deval score
+%
+%     figure(100); subplot 121;hold on;
+%     for i = 1:length(type)
+%         plot(mean(results(i).beta(sched.devalEnd-win:sched.devalEnd)),results(i).devalScore,'.','Color',map(i,:),'MarkerSize',30);
+%     end
+%     xlabel('\beta')
+%     ylabel('devaluation score')
+%     prettyplot
 % end
-% xlabel('C(\pi_\theta)')
-% ylabel('reward')
-% prettyplot
-% set(gcf, 'Position',  [300, 300, 1000, 300])
+%
+%
+% %% relationship between a changing beta and a changing policy complexity
+%
+% % moving est of mutual information
+% for i = 1:length(type)
+%     results(i).movMI = movmean(results(i).mi, win,'Endpoints','shrink');
+%     results(i).movCost = movmean(results(i).cost,win,'Endpoints','shrink');
+%     results(i).movRew = movmean(results(i).rho,win,'Endpoints','shrink');
+%     results(i).movBeta = movmean(results(i).beta,win,'Endpoints','shrink');
+%     results(i).estBeta = gradient(results(i).movCost)./gradient(results(i).movRew);
+% end
+%
+% % what is relationship between changing beta and a changing policy complexity
+% % does beta predict the policy complexity? --> YES, the bigger the beta,
+% % the bigger the policy complexity is allowed to be
+%
+% % if dbeta is 0, v changes w I the same
+% % if dbeta is big, policy cost changes a lot (there's a lot of room to move) for the same reward
 
-
-%% MI (action = press)
-
-% figure; hold on;
-% for i = 1:length(type)
-%     bar(i,mean(results(i).mi(end-num:end)),'FaceColor',map(i,:));
-% end
-% set(gca,'xtick',[1:4],'xticklabel',type)
-% ylabel('mutual information I(S;A)')
-% prettyplot
-%
-%
-% figure; hold on;
-% for i = 1:length(type)
-%     plot(results(i).mi,'Color',map(i,:));
-%     plot(results(i).rho,'Color',map(i,:));
-% end
-% set(gca,'xtick',[1:4],'xticklabel',type)
-% ylabel('mutual information I(S;A)')
-% prettyplot
-
-
-% %% rho and rpe
-% figure; hold on; subplot 221; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).rho,win,'Endpoints','shrink'),'LineWidth',1.5);
-% end
-%
-% ylabel('avg rew')
-% prettyplot
-%
-% subplot 222; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).rpe,win,'Endpoints','shrink'),'LineWidth',1.5);
-% end
-% xlabel('time(s)')
-% ylabel('\delta')
-% prettyplot
-%
-% subplot 223; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movCost,results(i).movRew,'.');
-% end
-%
-% subplot 224; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movMI,results(i).movRew,'.');
-% end
-%
-% %% instantaneous contingency
-% figure; hold on; subplot 121; hold on;
-% for i = 1:length(type)
-%     plot(movmean(results(i).cont,win,'Endpoints','shrink'),'LineWidth',2);
-% end
-%
-% ylabel('contingency')
-% xlabel('time (s)')
-% prettyplot
-%
-% % contingency and press rate
-% subplot 122; hold on;
-% for i = 1:length(type)
-%     plot(results(i).movActRate,movmean(results(i).cont,win,'Endpoints','shrink'),'.');
-% end
-% ylabel('contingency')
-% xlabel('action rate \lambda_a')
-% prettyplot
-
-% figure(100); subplot 122;hold on;
-%
-% for i = 1:length(type)
-%     plot(mean(results(i).cost(sched.devalTime-win:sched.devalTime)), mean(results(i).rho(sched.devalTime-win:sched.devalTime)),'.','Color',map(i,:),'MarkerSize',30 )
-% end
-% xlabel('policy complexity')
-% ylabel('average reward')
-% prettyplot
 end

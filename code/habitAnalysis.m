@@ -2,7 +2,7 @@ function habitAnalysis(fig)
 % PURPOSE: reproducing major habit findings
 % Written by Lucy Lai
 
-close all 
+%close all
 
 % plot settings
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools'); % various plotting tools
@@ -21,29 +21,29 @@ sched.beta = 1;     % starting beta; high beta = low cost. beta should increase 
 %sched.cmax = 0.5;     % max complexity (low v high)
 
 switch fig
-    case 0 % basic data analysis
+    %% basic data analysis
+    case 0 
         
-        % Garr et. al. data
-        load('all_data_cleaned.mat')
+        load('all_data_cleaned.mat') % Garr et. al. data
         
-        %% ratio plots
+        %% 4 schedules action rate over time 
+        % ratio plots
         FR20.test = FR20.test./60;
         VR20.test = VR20.test./60;
         figure; hold on;
         h(1,:) = errorbar(mean(FR20.actRate),sem(FR20.actRate,1),'LineWidth',2,'Color',map(1,:)); %plot(mean(FR20.actRate));
         h(2,:) = errorbar(mean(VR20.actRate),sem(VR20.actRate,1),'LineWidth',2,'Color',map(2,:)); %plot(mean(VR20.actRate));
-       
-        %% interval plots
+        
+        % interval plots
         FI45.test = FI45.test./60;
         VI45.test = VI45.test./60;
         h(3,:) = errorbar(mean(FI45.actRate),sem(FI45.actRate,1),'LineWidth',2,'Color',map(3,:)); %plot(mean(FI45.actRate));
         h(4,:) = errorbar(mean(VI45.actRate),sem(VI45.actRate,1),'LineWidth',2,'Color',map(4,:)); %plot(mean(VI45.actRate));
         plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--') %
-        legend(h,'FR20','VR20','FI45','VI45','deval'); legend('boxoff'); 
+        legend(h,'FR20','VR20','FI45','VI45','deval'); legend('boxoff');
         ylabel('lever presses/sec'); xlabel('sessions'); prettyplot;
-  
         
-        % deval
+        %% devalulation (GROUP)
         figure; hold on;
         for d = 1:3
             subplot 221; hold on;
@@ -71,8 +71,8 @@ switch fig
             b(2).LineWidth = 2;
             e.Color = map(3,:);
             e.LineWidth = 2;
-            
             title('FI45')
+             
             subplot 224; hold on;
             [b e] = barwitherr(sem(VI45.test(:,:,d),1),d, mean(VI45.test(:,:,d)),'FaceColor',map(4,:));
             b(2).FaceColor = [1 1 1];
@@ -84,17 +84,56 @@ switch fig
         end
         subplot 221; hold on;
         ylabel('lever presses/sec'); xlabel('deval session #');
-        legend('valued','devalued'); legend('boxoff'); 
+        legend('valued','devalued'); legend('boxoff');
         equalabscissa(2,2)
         subprettyplot(2,2)
-        why
+        
+        % individual animals
+        figure; hold on;
+        k = [1 5 9]; % subplot indices
+        for d = 1:3
+            subplot(3,4,k(d)); hold on;
+            b = bar(FR20.test(:,:,d),'FaceColor',map(1,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(1,:);
+            b(2).LineWidth = 2;
+            
+            subplot(3,4,k(d)+1); hold on;
+            b  = bar(VR20.test(:,:,d),'FaceColor',map(2,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(2,:);
+            b(2).LineWidth = 2;
+            
+            subplot(3,4,k(d)+2); hold on;
+            b = bar(FI45.test(:,:,d),'FaceColor',map(3,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(3,:);
+            b(2).LineWidth = 2;
+             
+            subplot(3,4,k(d)+3); hold on;
+            b = bar(VI45.test(:,:,d),'FaceColor',map(4,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(4,:);
+            b(2).LineWidth = 2;
+            
+        end
+        subplot 341;  title('FR20'); ylabel('session 2');legend('valued','devalued'); legend('boxoff');
+        subplot 342;  title('VR20'); 
+        subplot 343;  title('FI45')
+        subplot 344;  title('VI45')
+        subplot 345; ylabel('session 10');
+        subplot 349; ylabel('session 20');
+        subplot(3,4,12)
+        ylabel('lever presses/sec'); xlabel('rat #')
+        subprettyplot(3,4)
+        
+    %% REED 2001
     case 1
         agent.alpha_w = 0.1;
         agent.alpha_t = 0.1;
         agent.alpha_r = 0.1;
         agent.alpha_b = 5;
         sched.cmax = 100;
-        %% REED 2001
         
         sched.R = 8;
         sched.I = 20;
@@ -175,17 +214,17 @@ switch fig
         % Both ratings of causal effectiveness and response rates were higher in the VR schedule.
         % (Analyze contingency)
         
+    %% decreasing action rates for increasing ratio and interval parameter schedules 
     case 2
-        %% decreasing action rates for increasing ratio and interval parameter schedules
-        % double check if original studies were variable or fixed
         
+        % double check if original studies were variable or fixed
         clear VI
         clear VR
         R = [20 40 80];
         I = [30 53 109];
-        % delay = [16 32 64];
+        % delay = [16 32 64]; 
         sched.k = 1;
-        sched.timeSteps = 3000;
+        sched.timeSteps = 3000;                            % how long were these 
         sched.devalTime = sched.timeSteps;                 % timestep where outcome gets devalued
         
         for i = 1:length(R)
@@ -201,7 +240,7 @@ switch fig
             
             % for VI only
             sched.I = I(i);
-            sched.times = contingency_generateVI(sched.I);   % pre-generated number of actions before reward
+            sched.times = contingency_generateVI(sched.I);     % pre-generated number of actions before reward
             sched.times(sched.times > 2*sched.I) = [];
             sched.type = 'VI';
             
@@ -219,117 +258,204 @@ switch fig
         xlabel('interval parameter')
         ylabel('press rate')
         subprettyplot(1,2)
-        
+    
+    %% simulating fits to Garr's data
     case 3
-        map = brewermap(4,'RdGy');
-        set(0, 'DefaultAxesColorOrder', map) % first three rows
+        map = brewermap(4,'*RdBu');
+        temp = map(3,:);
+        map(3,:) = map(4,:);
+        map(4,:) = temp;  % swap colors so darker ones are fixed
         %% Garr's data
         type = {'FR' 'VR' 'FI' 'VI'};
-        load('example_rats_cleaned.mat'); % load data
-        
-        sched.model = 3;
+        load('all_data_cleaned.mat'); % load data
+        numrats = 8;
+        sched.model = 2;
         sched.R = 20; % in deciseconds (VR/FR20*10 = 200)
         sched.I = 45; % in deciseconds  (VI/FI45*10 = 450)
         sp = 1;
+        
         for typ = 1:length(type)  % for all sched types
-            for ses = 1:3         % for all sessions
+            for r = 1:2             % for each rat
                 sched.type = type{typ};
-                sched.timeSteps = timeSteps(typ,ses);
-                load(strcat(sched.type,'_params_s',num2str(ses),'.mat')); % get params and error
-                %params = [0.0151    0.0122    0.7151    0.0702    2.1222];
-                params = median(params);
-                
-                %% for FR only
+                load(strcat(sched.type,'_params_s',num2str(r),'.mat')); % get params and error
+   
+                sched.type = type{typ};
                 if sched.type == 'FR'
-                    data.lever = FR20.session(ses).training.lever_binned;
-                    data.reward = FR20.session(ses).training.reward_binned;
+                    data = FR20n(r);
+                    col = map(1,:);
+                elseif sched.type == 'VR'
+                    data = VR20n(r);
+                    col = map(2,:);
+                elseif sched.type == 'FI'
+                    data = FI45n(r);
+                    col = map(3,:);
+                elseif sched.type == 'VI'
+                    data = VI45n(r);
+                    col = map(4,:);
                 end
-                
-                %% for VR only
-                if sched.type == 'VR'
-                    sched.actions = [VR20.session(ses).actions];
-                    data.lever = VR20.session(ses).training.lever_binned;
-                    data.reward = VR20.session(ses).training.reward_binned;
-                end
-                
-                %% for FI only
-                if sched.type == 'FI'
-                    data.lever = FI45.session(ses).training.lever_binned;
-                    data.reward = FI45.session(ses).training.reward_binned;
-                end
-                
-                %% for VI only
-                if sched.type == 'VI'
-                    sched.times = [VI45.session(ses).times];
-                    data.lever = VI45.session(ses).training.lever_binned;
-                    data.reward = VI45.session(ses).training.reward_binned;
-                end
+                input.data = data;
                 
                 %% sanity checks (plots)
-                %makePlotsData(data.lever,data.reward,{sched.type})
-                % simulate valued and devalued
-                sched.deval = 1;
-                [model_devalued, sched] = habitSimulate(params, sched);
-                makePlotsData(data, model_devalued, {sched.type})
+                % simulate valued 
+                sched.deval = 0; sched.devalWin = 0;
+                input.sched = sched;
+                model_valued(r).sess = habitSimulate(params,input);
                 
-                sched.deval = 0;
-                [model_valued, sched] = habitSimulate(params, sched);
-                makePlotsData(data, model_valued, {sched.type})
+                % simulate devalued
+                sched.deval = 1; sched.devalWin = 100;
+                input.sched = sched;
+                model_devalued(r).sess = habitSimulate(params,input); 
                 
-                
-                %% sanity checks (compare training)
-                MD.train_reward(typ,ses) = mean(cat(1,model_devalued.outRate));
-                MD.train_lever(typ,ses) = mean(cat(1,model_devalued.actRate));
-                
-                MV.train_reward(typ,ses) = mean(cat(1,model_valued.outRate));
-                MV.train_lever(typ,ses) = mean(cat(1,model_valued.actRate));
-                
-                DD.train_reward(typ,ses) = sum(data.reward==1)/timeSteps(typ,ses);
-                DD.train_lever(typ,ses) = sum(data.lever==1)/timeSteps(typ,ses);
-                
-                % compare test
-                MD.test_lever(typ,ses) = mean(cat(1,model_devalued.actRateTest));
-                MV.test_lever(typ,ses) = mean(cat(1,model_valued.actRateTest));
-                
-                DD.test_lever(typ,ses) = test_lever_rates.devalued(typ,ses)/60; % per minute / 60 = seconds
-                DV.test_lever(typ,ses) = test_lever_rates.valued(typ,ses)/60;
-                
-                % plot change in lever press rate
-                figure(100); hold on;
-                subplot(4,3,sp); hold on;
-                bar(1,[DV.test_lever(typ,ses) DD.test_lever(typ,ses)]./DD.train_lever(typ,ses)); % data (devalued, valued)
-                bar(2,[MV.test_lever(typ,ses) MD.test_lever(typ,ses)]./[MV.train_lever(typ,ses) MD.train_lever(typ,ses)]); % model (devalued, valued)
-                set(gca,'xtick',[1 2],'xticklabel',{'data' 'model'})
+            
+                % look at theta at end of deval and at end of test
+                % look at the RPE at end of deval and at end of test
+%                 for s = model_devalued(r).sess(1).sched.devalsess % for each session
+%                     % mean RPE (end of deval - end of train) should expect to be positive
+%                     rpe(s,1,r) = mean(model_devalued(r).sess(s).rpe(model_devalued(r).sess(s).sched.trainEnd:model_devalued(r).sess(s).sched.devalEnd));
+%                     % mean RPE (end of test - end of deval) should expect to be positive
+%                     rpe(s,2,r) = mean(model_devalued(r).sess(s).rpe(model_devalued(r).sess(s).sched.devalEnd:end));
+%                     
+%                     % look at theta at time right before deval
+%                     thetad1(:,:,r) = [model_devalued(r).sess(2).theta(:,:,model_devalued(r).sess(s).sched.trainEnd) model_devalued(r).sess(10).theta(:,:,model_devalued(r).sess(10).sched.trainEnd) model_devalued(r).sess(20).theta(:,:,model_devalued(r).sess(20).sched.trainEnd)];
+%                     thetad2(:,:,r) = [model_devalued(r).sess(2).theta(:,:,model_devalued(r).sess(s).sched.devalEnd) model_devalued(r).sess(10).theta(:,:,model_devalued(r).sess(10).sched.devalEnd) model_devalued(r).sess(20).theta(:,:,model_devalued(r).sess(20).sched.devalEnd)];
+%                     
+%                     % sum change in theta (end of deval - end of train)
+%                     d_theta1(s,:,r) = sum(model_devalued(r).sess(s).theta(:,:,model_devalued(r).sess(s).sched.devalEnd)-model_devalued(r).sess(s).theta(:,:,model_devalued(r).sess(s).sched.trainEnd));
+%                     
+%                     % sum change in theta (end of test - end of deval) positive
+%                     d_theta2(s,:,r) = sum(model_devalued(r).sess(s).theta(:,:,end)-model_devalued(r).sess(s).theta(:,:,model_devalued(r).sess(s).sched.devalEnd));
+%                     beta(s,1,r) = model_devalued(r).sess(s).beta(model_devalued(r).sess(s).sched.trainEnd);
+%                     ecost(s,1,r) = model_devalued(r).sess(s).ecost(model_devalued(r).sess(s).sched.trainEnd);
+%                     
+%                     % change in pi_as
+%                     pas(s,1:2,r) = mean(model_devalued(r).sess(s).pi_as(model_devalued(r).sess(s).sched.trainEnd-300:model_devalued(r).sess(s).sched.trainEnd,:)); % during train
+%                     pas(s,3:4,r) = mean(model_devalued(r).sess(s).pi_as(model_devalued(r).sess(s).sched.devalEnd:end,:)); % after deval
+%                 end
+               rew = []; cst = []; rho = [];
+                for s = 1:20
+                    endRho(r,s) = model_devalued(r).sess(s).rho(model_devalued(r).sess(s).sched.trainEnd);
+                    endCost(r,s) = model_devalued(r).sess(s).ecost(model_devalued(r).sess(s).sched.trainEnd);
+                    
+                    sz= length(movmean([input.data.session(s).training.reward_binned],200));
+                    rew = [rew movmean([input.data.session(s).training.reward_binned],200)];
+                    rho = [rho model_devalued(r).sess(s).rho(1:sz)];
+                    cst = [cst model_devalued(r).sess(s).ecost(1:sz)];
+                  
+                end
+                    
+                figure; hold on;
+                scatter(cst,rew, 20, brewermap(length(rew),'Blues'), 'filled');
+                ylabel('avg reward')
+                xlabel('policy complexity')
                 prettyplot
                 
-                figure(200); hold on;
-                subplot(4,3,sp); hold on;
-                bar(1,[DV.test_lever(typ,ses) DD.test_lever(typ,ses)]); % data (devalued, valued)
-                bar(2,[MV.test_lever(typ,ses) MD.test_lever(typ,ses)]); % model (devalued, valued)
+%                  figure; hold on;
+%                 scatter(cst,rho, 20, brewermap(length(rew),'Blues'), 'filled');
+%                 ylabel('avg reward')
+%                 xlabel('policy complexity')
+%                 prettyplot
                 
                 
-                set(gca,'xtick',[1 2],'xticklabel',{'data' 'model'})
-                prettyplot
-                sp = sp+1;
-            end
+%                 figure(1); hold on;
+%                 subplot 311;hold on;plot([model_devalued(r).sess(:).movActRate]);plot([model_devalued(r).sess(:).movOutRate]);
+%                 legend('action rate', 'outcome rate')
+%                 subplot 312;hold on;plot([model_devalued(r).sess(:).beta]);ylabel('\beta')
+%                 plot([find([model_devalued(r).sess(:).beta]==0)' find([model_devalued(r).sess(:).beta]==0)'],[ylim],'k--','LineWidth',1)
+%                 subplot 313;hold on;plot([model_devalued(r).sess(:).ecost]); ylabel('E[C(\pi)]')
+%                 se = plot([find([model_devalued(r).sess(:).beta]==0)' find([model_devalued(r).sess(:).beta]==0)'],[ylim],'k--','LineWidth',1)
+%                 legend(se,'sessions'); legend('boxoff'); 
+%                 subprettyplot(3,1)
+                %subplot 414;hold on;plot([model_devalued(r).sess(:).pa]);hold on;plot([model_devalued(r).sess(:).pi_as(:,2)])
+                
+                %subplot 414;hold on;plot(1./[model_devalued(r).sess(:).beta].* [model_devalued(r).sess(:).ecost])
+                %figure; hold on;
+                %plot([model_devalued(r).sess(:).ecost],[model_devalued(r).sess(:).rho],'o')
+                
+                %figure; %look at theta at time right before deval
+                
+                
+                %                 figure (2);hold on;subplot 121; hold on;plot(beta,rpe(:,1),'o'); % big beta means bigger RPE during devaluation, RPE should increase through learning
+                %                 subplot 122; hold on; bar([[model_valued(r).sess(:).postTestRate];[model_devalued(r).sess(:).postTestRate]]')
+                %                 legend('valued','devalued')
+            end % for each rat
             
             
-        end
-        subplot (4,3,1)
-        title('2 days')
-        legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
-        subplot (4,3,2)
-        title('10 days')
-        subplot (4,3,3)
-        title('20 days')
+            makePlotsData(data, model_devalued, model_valued)
+                 
+          
+            
+            
+%             beta = squeeze(beta);ecost = squeeze(ecost);
+%             rpe = squeeze(rpe(:,1,:));dtheta = squeeze(d_theta1(:,1,:));
+%             beta(beta==0) = [];
+%             ecost(ecost==0) = [];
+%             rpe(rpe==0) = [];
+%             dtheta(dtheta==0) = [];
+%             figure(3);
+%             subplot 131;hold on;plot(rpe,dtheta,'o','Color',col); ylabel('\Delta \theta(no press)');xlabel('RPE \delta');prettyplot
+%             subplot 132;hold on;plot(beta,rpe,'o','Color',col); ylabel('RPE \delta');xlabel('\beta');prettyplot
+%             subplot 133;hold on;plot((1./beta).*ecost,rpe,'o','Color',col); xlabel('1/\beta * C(\pi)');ylabel('RPE \delta');prettyplot
+%       
+            %rpe
+            %d_theta1
+            %beta
+            %pas
+            
+            
+            %% sanity checks (compare training)
+            %MD.train_reward(typ,s) = mean(cat(1,model_devalued.outRate));
+            %MD.train_lever(typ,s) = mean(cat(1,model_devalued.actRate));
+            
+            %MV.train_reward(typ,s) = mean(cat(1,model_valued.outRate));
+            %MV.train_lever(typ,s) = mean(cat(1,model_valued.actRate));
+            
+            %DD.train_reward(typ,s) = sum(data.reward==1)/timeSteps(typ,s);
+            %DD.train_lever(typ,s) = sum(data.lever==1)/timeSteps(typ,s);
+            
+            % compare test
+            %MD.test_lever(typ,s) = mean(cat(1,model_devalued.actRateTest));
+            %MV.test_lever(typ,s) = mean(cat(1,model_valued.actRateTest));
+            
+            %DD.test_lever(typ,s) = test_lever_rates.devalued(typ,s)/60; % per minute / 60 = seconds
+            %DV.test_lever(typ,s) = test_lever_rates.valued(typ,s)/60;
+            
+            % plot change in lever press rate
+            %                 figure(100); hold on;
+            %                 subplot(4,3,sp); hold on;
+            %                 bar(1,[DV.test_lever(typ,s) DD.test_lever(typ,s)]./DD.train_lever(typ,s)); % data (devalued, valued)
+            %                 bar(2,[MV.test_lever(typ,s) MD.test_lever(typ,s)]./[MV.train_lever(typ,s) MD.train_lever(typ,s)]); % model (devalued, valued)
+            %                 set(gca,'xtick',[1 2],'xticklabel',{'data' 'model'})
+            %                 prettyplot
+            %
+            %                 figure(200); hold on;
+            %                 subplot(4,3,sp); hold on;
+            %                 bar(1,[DV.test_lever(typ,s) DD.test_lever(typ,s)]); % data (devalued, valued)
+            %                 bar(2,[MV.test_lever(typ,s) MD.test_lever(typ,s)]); % model (devalued, valued)
+            %
+            %
+            %                 set(gca,'xtick',[1 2],'xticklabel',{'data' 'model'})
+            %                 prettyplot
+            %                 sp = sp+1;
+            
+        end % type
         
-        subplot (4,3,10)
-        ylabel('percent baseline lever press')
-        legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
-        % to convert from mins to deciseconds:
-        % 5 mins * 600 decisecs per min = 300 "timesteps"
-        % 27361 decisecs / 600 decisecs per min ~= 45 mins = 2736 seconds
+        
 end
+subplot (4,3,1)
+title('2 days')
+legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
+subplot (4,3,2)
+title('10 days')
+subplot (4,3,3)
+title('20 days')
+
+subplot (4,3,10)
+ylabel('percent baseline lever press')
+legend('valued', 'devalued', 'valued', 'devalued'); legend('boxoff')
+% to convert from mins to deciseconds:
+% 5 mins * 600 decisecs per min = 300 "timesteps"
+% 27361 decisecs / 600 decisecs per min ~= 45 mins = 2736 seconds
+
 
 %% undertraining vs overtraining
 % more habit in overtraining
@@ -352,7 +478,7 @@ end
 end
 
 
-function makePlotsData(data,model,type)
+function makePlotsData(data,model,modelv)
 %% init color map
 map = brewermap(4,'*RdBu');
 temp = map(3,:);
@@ -360,166 +486,164 @@ map(3,:) = map(4,:);
 map(4,:) = temp;  % swap colors so darker ones are fixed
 set(0, 'DefaultAxesColorOrder', map) % first three rows
 
-timeSteps = length(data.lever);
+load('all_data_cleaned.mat') % actual data
+sched = model(2).sess.sched;
+% format of test is: # rates x [val deval] columns , converted to actions
+% per second
+FI45.test = FI45.test./60;
+VI45.test = VI45.test./60;
+FR20.test = FR20.test./60;
+VR20.test = VR20.test./60;
 
-% %% cumulative sum plots
-% num = 500; % last how many # trials to look at
-% figure; hold on;
-% cs = cumsum(data.lever(end-num:end));
-% h(1,:) = plot(cs,'Color',map(1,:),'LineWidth',2);
-% xplot = find(data.reward(end-num:end)==1);
-% line([xplot' xplot'+10]',[cs(xplot)' cs(xplot)']','LineWidth',2,'Color','k');
-%
-% cs = cumsum(model.a(timeSteps-num:timeSteps)-1);
-% h(2,:) = plot(cs,'Color',map(2,:),'LineWidth',2);
-% xplot = find(model.x(timeSteps-num:timeSteps)==2);
-% line([xplot' xplot'+10]',[cs(xplot)' cs(xplot)']','LineWidth',2,'Color','k');
-%
-% legend(h,{'data','model'});
-% legend('boxoff')
-% xlabel('time')
-% ylabel('cumulative # actions')
-% prettyplot
+if sched.type=='FR'
+    data = FR20;
+    col = map(1,:);
+elseif sched.type=='VR'
+    data = VR20;
+    col = map(2,:);
+elseif sched.type=='FI'
+    data = FI45;
+    col = map(3,:);
+elseif sched.type=='VI'
+    data = VI45;
+    col = map(4,:);
+end
 
 %% outcome and action rates over time
 win = 100; % # seconds moving window
-for i = 1:length(type)
-    outRate = sum(data.reward==1)/timeSteps;
-    actRate = sum(data.lever==1)/timeSteps;
-    
-    % moving average
-    movOutRate = movmean(data.reward, win,'Endpoints','shrink');
-    movActRate = movmean(data.lever, win,'Endpoints','shrink');
-    
-end
+sess = size(model(2).sess,2); % get number of sessions
+% for i = 1:length(model) % for each subject
+%     for s = 1:sess % for each session
+%         if ismember(s,sched.devalsess)
+%             %model(i).sess(s).timeSteps = size(model(i).sess(s).a,2); % session length, timesteps;
+%             model(i).sess(s).outRate = sum(model(i).sess(s).x(1:sched.devalEnd)==2)/sched.devalEnd;
+%             model(i).sess(s).actRate = sum(model(i).sess(s).a(1:sched.devalEnd)==2)/sched.devalEnd;
+%             model(i).sess(s).avgRew = mean(model(i).sess(s).rho(1:sched.devalEnd));
+%             model(i).sess(s).avgBeta = mean(model(i).sess(s).beta(1:sched.devalEnd));
+%             model(i).sess(s).postTestRate = sum(model(i).sess(s).a(sched.devalEnd:end)==2)/sched.testWin;
+%             model(i).sess(s).preTestRate = sum(model(i).sess(s).a(sched.trainEnd-sched.testWin:sched.trainEnd)==2)/sched.testWin;
+%         else
+%             model(i).sess(s).timeSteps = size(model(i).sess(s).a,2); % session length, timesteps;
+%             timeSteps = model(i).sess(s).timeSteps;
+%             model(i).sess(s).outRate = sum(model(i).sess(s).x==2)/sched.trainEnd;
+%             model(i).sess(s).actRate = sum(model(i).sess(s).a==2)/sched.trainEnd;
+%             model(i).sess(s).avgRew = mean(model(i).sess(s).rho);
+%             model(i).sess(s).avgBeta = mean(model(i).sess(s).beta);
+%         end
+%     end
+% end
 
+% if it's a devaluation session, separate that data out into model.test
 figure; hold on;
-subplot(2,4,1:3); hold on;
-plot(movOutRate,'LineWidth',1.5)
-prettyplot
-ylabel('outcome rate')
-legend([type 'devaluation'],'FontSize',15); legend('boxoff')
-
-subplot(2,4,5:7); hold on;
-
-plot(movActRate,'LineWidth',1.5)
-
-xlabel('time (s)')
-ylabel('action rate')
-prettyplot
-
-subplot(2,4,4); hold on;
-
-bar(1,outRate);
-
-legend(type); legend('boxoff')
-set(gca,'xtick',[1:2],'xticklabel',type)
-prettyplot
-subplot(2,4,8); hold on;
-for i = 1:length(type)
-    bar(1,actRate);
-end
-set(gca,'xtick',[1:2],'xticklabel',type)
-prettyplot
-
-
-for i = 1:length(type)
-    outRate = mean(cat(1,model.outRate));
-    actRate = mean(cat(1,model.actRate));
-    
-    % moving average
-    movOutRate = mean(cat(1,model.movOutRate));
-    movActRate = mean(cat(1,model.movActRate));
-    
-end
-
-subplot(2,4,1:3); hold on;
-shadedErrorBar(1:size(model(1).movActRate,2),mean(cat(1,model.movOutRate)),sem(cat(1,model.movOutRate),1),{'LineWidth',1.5,'Color',map(2,:)},1)
-plot([timeSteps timeSteps],ylim,'k--','LineWidth',2)
-prettyplot
-ylabel('outcome rate')
-legend([type 'devaluation'],'FontSize',15); legend('boxoff')
-
-subplot(2,4,5:7); hold on;
-shadedErrorBar(1:size(model(1).movActRate,2),mean(cat(1,model.movActRate)),sem(cat(1,model.movActRate),1),{'LineWidth',1.5,'Color',map(2,:)},1)
-plot([timeSteps timeSteps],ylim,'k--','LineWidth',2)
-xlabel('time (s)')
-ylabel('action rate')
-prettyplot
-
-subplot(2,4,4); hold on;
-bar(2,outRate);
-legend('data','model'); legend('boxoff')
-set(gca,'xtick',[1:2],'xticklabel',type)
-prettyplot
-
-subplot(2,4,8); hold on;
-bar(2,actRate);
-
-set(gcf, 'Position',  [300, 300, 800, 500])
-
-%%
-
-%
-% figure; hold on;
-% subplot 311; hold on;
-% for i = 1:length(type)
-%     plot(model(i).beta,'LineWidth',1.5)
+%subplot 211; hold on;
+% for r = 1:length(model)
+%     outRate(r,:) = cat(2,model(r).sess.outRate);
 % end
-% plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-% ylabel(' \beta')
-% legend([type 'devaluation'],'FontSize',15); legend('boxoff')
-%
+% plot(outRate,'LineWidth',2,'Color',col);
+% %errorbar(mean(outRate),sem(outRate,1),'LineWidth',2,'Color',col);
+% prettyplot
+% ylabel('outcome rate')
+% legend([sched.type],'FontSize',15); legend('boxoff')
+% axis([0 22 0 1])
+% plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--')
+% 
 % subplot 312; hold on;
-% for i = 1:length(type)
-%     plot(movmean(model.cost,500,'Endpoints','shrink'),'LineWidth',1.5)
-% end
-% plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-% ylabel('policy cost C(\pi_\theta)')
-%
-% subplot 313; hold on;
-% for i = 1:length(type)
-%     plot(movmean((1./model.beta).* model.cost', win,'Endpoints','shrink'),'LineWidth',1.5)
-% end
-% plot([sched.devalTime sched.devalTime],ylim,'k--','LineWidth',2)
-% ylabel('\beta^{-1} C(\pi_\theta)')
-%
-% subprettyplot(3,1)
-%
-% set(gcf, 'Position',  [300, 300, 700, 500])
-%
-%
-% %% action rate before and after devaluation
-% if sched.devalTime ~= timeSteps
-%     devalWin = timeSteps-sched.devalTime;
-%
-%     figure; subplot 121; hold on;
-%     for i = 1:length(type)
-%         b = bar(i,[sum(results(i).a(sched.devalTime-devalWin:sched.devalTime)-1)/devalWin sum(results(i).a(sched.devalTime+1:end)-1)/devalWin],'FaceColor',map(i,:));
-%         b(2).FaceColor = [1 1 1];
-%         b(2).EdgeColor = map(i,:);
-%         b(2).LineWidth = 2;
-%
-%     end
-%     ylabel('action (press) rate')
-%     legend('before','after','FontSize',15,'Location','NorthWest'); legend('boxoff')
-%     set(gca,'xtick',[1:4],'xticklabel',type)
-%
-%
-%     subplot 122; hold on; % change in action rate
-%     % change in action rate
-%     for i = 1:length(type)
-%         results(i).devalScore = sum(results(i).a(sched.devalTime-devalWin:sched.devalTime)-1)/devalWin - sum(results(i).a(sched.devalTime+1:end)-1)/devalWin;
-%         bar(i,results(i).devalScore,'FaceColor',map(i,:));
-%     end
-%     ylabel('devaluation score (pre-post)')
-%     axis([0 5 0 0.5])
-%     set(gca,'xtick',[1:4],'xticklabel',type)
-%
-%     % beta at time of deval vs deval score
-%     subprettyplot(1,2)
-%
-% end
-% set(gcf, 'Position',  [300, 300, 800, 300])
+for r = 1:length(model)
+    actRate(r,:) = cat(2,model(r).sess.actRate);
+end
+errorbar(mean(data.actRate),sem(data.actRate,1),'LineWidth',2,'Color',[0 0 0]);
+%plot(actRate,'LineWidth',2,'Color',col);
+errorbar(mean(actRate),sem(actRate,1),'LineWidth',2,'Color',col);
+xlabel('session #')
+ylabel('action rate')
+axis([0 22 0 1])
+plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--')
+prettyplot
 
+% subplot 212;  hold on;
+% for r = 1:length(model)
+%     beta(r,:) = cat(2,model(r).sess.avgBeta);
+% end
+% errorbar(mean(beta),sem(beta,1),'LineWidth',2,'Color',col);
+% axis([0 22 ylim])
+% xlabel('session #')
+% ylabel('\beta')
+% prettyplot
+
+set(gcf, 'Position',  [500, 500, 800, 300])
+
+%% devaluation
+for d = 1:3
+    for r = 1:length(model)
+        test(r,:,d) = [modelv(r).sess([sched.devalsess(d)]).postTestRate model(r).sess([sched.devalsess(d)]).postTestRate];
+    end
+end
+
+for d = 1:3
+    subplot 121; hold on;
+    [b e] = barwitherr(sem(data.test(:,:,d),1),d, mean(data.test(:,:,d)),'FaceColor',[0 0 0]);
+    b(2).FaceColor = [1 1 1];
+    b(2).EdgeColor = [0 0 0];
+    b(2).LineWidth = 2;
+    e.Color = [0 0 0];
+    e.LineWidth = 2;
+    
+    title(strcat('data - ',sched.type))
+    
+    subplot 122; hold on;
+    [b e] = barwitherr(sem(test(:,:,d),1),d, mean(test(:,:,d)),'FaceColor',col);
+    b(2).FaceColor = [1 1 1];
+    b(2).EdgeColor = col;
+    b(2).LineWidth = 2;
+    e.Color = col;
+    e.LineWidth = 2;
+    
+    title('model')
+end
+equalabscissa(1,2)
+subprettyplot(1,2)
+
+set(gcf, 'Position',  [500, 150, 800, 300])
+
+%% individual
+
+ % individual animals
+        figure; hold on;
+        k = [1 5 9]; % subplot indices
+        for d = 1:3
+            subplot(3,1,d); hold on;
+            b = bar(test(:,:,d),'FaceColor',map(1,:));
+            b(2).FaceColor = [1 1 1];
+            b(2).EdgeColor = map(1,:);
+            b(2).LineWidth = 2;
+%             
+%             subplot(3,4,k(d)+1); hold on;
+%             b  = bar(VR20.test(:,:,d),'FaceColor',map(2,:));
+%             b(2).FaceColor = [1 1 1];
+%             b(2).EdgeColor = map(2,:);
+%             b(2).LineWidth = 2;
+%             
+%             subplot(3,4,k(d)+2); hold on;
+%             b = bar(FI45.test(:,:,d),'FaceColor',map(3,:));
+%             b(2).FaceColor = [1 1 1];
+%             b(2).EdgeColor = map(3,:);
+%             b(2).LineWidth = 2;
+%              
+%             subplot(3,4,k(d)+3); hold on;
+%             b = bar(VI45.test(:,:,d),'FaceColor',map(4,:));
+%             b(2).FaceColor = [1 1 1];
+%             b(2).EdgeColor = map(4,:);
+%             b(2).LineWidth = 2;
+            
+        end
+        equalabscissa(3,1)
+%         subplot 341;  title('FR20'); ylabel('session 2');legend('valued','devalued'); legend('boxoff');
+%         subplot 342;  title('VR20'); 
+%         subplot 343;  title('FI45')
+%         subplot 344;  title('VI45')
+%         subplot 345; ylabel('session 10');
+%         subplot 349; ylabel('session 20');
+%         subplot(3,4,12)
+%         ylabel('lever presses/sec'); xlabel('rat #')
+%         subprettyplot(3,4)
 end
