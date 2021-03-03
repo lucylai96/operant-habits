@@ -24,25 +24,26 @@ close all
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                  % various plot tools
 habitColors;
 
-% params: [R  I  model timeSteps  beta_0  deval]
-% aparams: [alpha_w  alpha_th  alpha_pi  alpha_b  acost cmax]
-if nargin <1
-    params =  [20 20 4 5000 0.5 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
-    aparams = [0.01 0.01 0.1 0.001 0.03 0.5];
+% params: [R  I  model timeSteps deval]
+% aparams: [lrate_w  lrate_th  lrate_pi  lrate_b  beta  acost  cmax]
+if nargin <1 
+    params =  [20 20 4 5000 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
+    aparams = [0.1 0.1 0.1 0.1 5 0.02 1];
     type = {'FR','VR','FI','VI'};
 end
 run = 1; 
 sched.sessnum = 1;                  % number of sessions
 
 % agent parameters
-agent.alpha_w = aparams(1);         % value learning rate
-agent.alpha_t = aparams(2);         % policy learning rate
-agent.alpha_pi = aparams(3);        % marginal policy learning rate
-agent.alpha_b = aparams(4);         % beta learning rate
-agent.acost = aparams(5);           % action cost
-agent.cmax = aparams(6);            % max complexity
-agent.alpha_r = 0.001;              % rho learning rate
-agent.alpha_e = 0.001;              % policy cost learning rate
+agent.lrate_w = aparams(1);         % value learning rate
+agent.lrate_theta = aparams(2);         % policy learning rate
+agent.lrate_p = aparams(3);        % marginal policy learning rate
+agent.lrate_b = aparams(4);         % beta learning rate
+agent.beta = aparams(5);       % starting beta; high beta = low cost. beta should increase for high contingency
+agent.acost = aparams(6);           % action cost
+agent.cmax = aparams(7);            % max complexity
+agent.lrate_r = 0.001;              % rho learning rate
+agent.lrate_e = 0.001;              % policy cost learning rate
 
 % FR-20: 30 daily sessions, sessions terminated when 50 rewards were earned or 1 hour elapsed. Satiety devaluation test after sessions 2, 10, 20, and 30.
 % VR-20: same as above
@@ -57,8 +58,7 @@ sched.R = params(1);
 sched.I = params(2);
 model = params(3);
 timeSteps = params(4);
-beta = params(5);
-deval = params(6);
+deval = params(5);
 
 %% using data?
 garr = 0;
@@ -76,13 +76,12 @@ end
 
 %% initialize
 sched.model = model;     % which lesioned model to run
-sched.beta = beta;       % starting beta; high beta = low cost. beta should increase for high contingency
 sched.type = type;
 sched.k = 1;
 sched.timeSteps = timeSteps;
 
 % repetitions
-numrats = 5;                     % how many iterations/agents to run / avg over
+numrats = 1;                     % how many iterations/agents to run / avg over
 sched.trainEnd = timeSteps;      % timestep where outcome gets devalued
 sched.deval = deval;
 sched.devalsess = [2 10 20];     % sessions where devaluation will occur
@@ -101,7 +100,6 @@ end
 if sched.sessnum > 1       % multiple sessions
     for t = 1:length(type) % for each iteration
         sched.type = type{t};
-        
         if run == 1            % run simulations for 1 type at a time
             for i = 1:numrats  % for each iteration
                 results(i).sess = habitAgent(sched, agent); % # schedule types x 20 sessions
@@ -131,10 +129,13 @@ else
                 input.data = data;
                 results(t,:) = habitAgent(sched, agent, input.data); % # schedule types x 20 sessions
             else
-                
                 results(t,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
             end
-        end
+        end % type
+        l = legend(type)
+        title(strcat('Arming parameter:',num2str(sched.R)))
+        title(l,'Schedule')
+        prettyplot(20)
         save('results_all.mat','results')
     else
         load('results_all.mat')

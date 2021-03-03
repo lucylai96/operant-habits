@@ -21,112 +21,7 @@ sched.beta = 1;     % starting beta; high beta = low cost. beta should increase 
 %sched.cmax = 0.5;     % max complexity (low v high)
 
 switch fig
-    %% basic data analysis
-    case 0 
-        
-        load('all_data_cleaned.mat') % Garr et. al. data
-        
-        %% 4 schedules action rate over time 
-        % ratio plots
-        FR20.test = FR20.test./60;
-        VR20.test = VR20.test./60;
-        figure; hold on;
-        h(1,:) = errorbar(mean(FR20.actRate),sem(FR20.actRate,1),'LineWidth',2,'Color',map(1,:)); %plot(mean(FR20.actRate));
-        h(2,:) = errorbar(mean(VR20.actRate),sem(VR20.actRate,1),'LineWidth',2,'Color',map(2,:)); %plot(mean(VR20.actRate));
-        
-        % interval plots
-        FI45.test = FI45.test./60;
-        VI45.test = VI45.test./60;
-        h(3,:) = errorbar(mean(FI45.actRate),sem(FI45.actRate,1),'LineWidth',2,'Color',map(3,:)); %plot(mean(FI45.actRate));
-        h(4,:) = errorbar(mean(VI45.actRate),sem(VI45.actRate,1),'LineWidth',2,'Color',map(4,:)); %plot(mean(VI45.actRate));
-        plot([2.5 10.5 20.5;2.5 10.5 20.5],[ylim' ylim' ylim'],'k--') %
-        legend(h,'FR20','VR20','FI45','VI45','deval'); legend('boxoff');
-        ylabel('lever presses/sec'); xlabel('sessions'); prettyplot;
-        
-        %% devalulation (GROUP)
-        figure; hold on;
-        for d = 1:3
-            subplot 221; hold on;
-            [b e] = barwitherr(sem(FR20.test(:,:,d),1),d, mean(FR20.test(:,:,d)),'FaceColor',map(1,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(1,:);
-            b(2).LineWidth = 2;
-            e.Color = map(1,:);
-            e.LineWidth = 2;
-            title('FR20')
-            
-            subplot 222; hold on;
-            [b e] = barwitherr(sem(VR20.test(:,:,d),1),d, mean(VR20.test(:,:,d)),'FaceColor',map(2,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(2,:);
-            b(2).LineWidth = 2;
-            e.Color = map(2,:);
-            e.LineWidth = 2;
-            title('VR20')
-            
-            subplot 223; hold on;
-            [b e] = barwitherr(sem(FI45.test(:,:,d),1),d, mean(FI45.test(:,:,d)),'FaceColor',map(3,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(3,:);
-            b(2).LineWidth = 2;
-            e.Color = map(3,:);
-            e.LineWidth = 2;
-            title('FI45')
-             
-            subplot 224; hold on;
-            [b e] = barwitherr(sem(VI45.test(:,:,d),1),d, mean(VI45.test(:,:,d)),'FaceColor',map(4,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(4,:);
-            b(2).LineWidth = 2;
-            e.Color = map(4,:);
-            e.LineWidth = 2;
-            title('VI45')
-        end
-        subplot 221; hold on;
-        ylabel('lever presses/sec'); xlabel('deval session #');
-        legend('valued','devalued'); legend('boxoff');
-        equalabscissa(2,2)
-        subprettyplot(2,2)
-        
-        % individual animals
-        figure; hold on;
-        k = [1 5 9]; % subplot indices
-        for d = 1:3
-            subplot(3,4,k(d)); hold on;
-            b = bar(FR20.test(:,:,d),'FaceColor',map(1,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(1,:);
-            b(2).LineWidth = 2;
-            
-            subplot(3,4,k(d)+1); hold on;
-            b  = bar(VR20.test(:,:,d),'FaceColor',map(2,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(2,:);
-            b(2).LineWidth = 2;
-            
-            subplot(3,4,k(d)+2); hold on;
-            b = bar(FI45.test(:,:,d),'FaceColor',map(3,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(3,:);
-            b(2).LineWidth = 2;
-             
-            subplot(3,4,k(d)+3); hold on;
-            b = bar(VI45.test(:,:,d),'FaceColor',map(4,:));
-            b(2).FaceColor = [1 1 1];
-            b(2).EdgeColor = map(4,:);
-            b(2).LineWidth = 2;
-            
-        end
-        subplot 341;  title('FR20'); ylabel('session 2');legend('valued','devalued'); legend('boxoff');
-        subplot 342;  title('VR20'); 
-        subplot 343;  title('FI45')
-        subplot 344;  title('VI45')
-        subplot 345; ylabel('session 10');
-        subplot 349; ylabel('session 20');
-        subplot(3,4,12)
-        ylabel('lever presses/sec'); xlabel('rat #')
-        subprettyplot(3,4)
-        
+    
     %% REED 2001
     case 1
         agent.alpha_w = 0.1;
@@ -309,7 +204,7 @@ switch fig
             
                 % look at theta at end of deval and at end of test
                 % look at the RPE at end of deval and at end of test
-%                 for s = model_devalued(r).sess(1).sched.devalsess % for each session
+%                 for s = model_de                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  valued(r).sess(1).sched.devalsess % for each session
 %                     % mean RPE (end of deval - end of train) should expect to be positive
 %                     rpe(s,1,r) = mean(model_devalued(r).sess(s).rpe(model_devalued(r).sess(s).sched.trainEnd:model_devalued(r).sess(s).sched.devalEnd));
 %                     % mean RPE (end of test - end of deval) should expect to be positive
