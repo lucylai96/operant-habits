@@ -1,8 +1,32 @@
-function results = habitSimulate(params,input)
+function nLL = habitAgentFit(params, input)
+% PURPOSE: Reward-complexity in free-operant learning
+%
+% INPUTS:
+%   sched - details about the operant schedule
+%   agent (optional) - learning parameters, if simulating from params
+%   input (optional) - some data used to seed (if in fitting mode)
+%
+% OUTPUTS:
+%   results - structure
+%
+% NOTES:
+%
+% Written by Lucy Lai (May 2020)
+
+% INPUT: params - model parameters
+%        input - data
+%
+% use the data to fix:
+% (1) total timesteps
+% (2) the reward times / number of actions until reward
+% (3) the lever-press and reward times
+% each session separately (bc diff rats)
 
 % unpack
 sched = input.sched;
 timeSteps = input.timeSteps;
+a = input.a + 1; a(1) = 2;  % conditioning on data (actions)
+x = input.x + 1;  % conditioning on data (rewards)
 
 %% initialization
 
@@ -57,7 +81,7 @@ w = zeros(length(phi),1);      % value weights
 rho = 0;                       % avg reward init
 ecost = 0;
 ps = zeros(size(phi));
-p = [0.8 0.2];                                 % p(a) init
+p = [0.5 0.5];                                 % p(a) init
 
 sched.k = 1;
 sched.setrew = 0;
@@ -67,21 +91,19 @@ sched.devalWin = 0;  sched.testWin = 300;
 %deval = zeros(1,timeSteps);                       % a vector indicating when devaluation manipulation "turns on"
 %test = zeros(1,timeSteps);                        % a vector indicating when extinction test "turns on"
 
-a = 2;
-x = 2;
-k = 1;
-t = 2;
-rt = 1;
+k = 1; 
+t = 1;
 lik = 0;
 
 Ps = zeros(size(phi));
 Q = zeros(length(phi),2);
+rt = [1 find(input.x==1)];% reward times;
 while t <= timeSteps(end)
     
     %% define features
-    na = sum(a(rt:t-1)==2)+1; % number of actions since last reward
-    nt = t-rt+1;           % timesteps since last reward
-    
+    na = sum(a(rt(k):t)==2)+1; % number of actions since last reward 
+    nt = t-rt(k)+1;           % timesteps since last reward
+
     if nt>nS % a fix for conditions where the time / number of actions exceeds the number of features (rare)
         nt = nS;
     end
@@ -90,6 +112,14 @@ while t <= timeSteps(end)
         na = nS;
     end
     
+    % discrete noiseless state visits
+    Ps(na) = Ps(na) +1;
+    Ps(100+nt) = Ps(100+nt) +1;
+    
+    % discrete Q values
+    Q(na,a(t)) = Q(na,a(t))+[x(t)-1];
+    Q(100+nt,a(t)) = Q(100+nt,a(t))+[x(t)-1];
+    
     phi0 = phi;
     phi(:,1) = [Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
     
@@ -97,13 +127,7 @@ while t <= timeSteps(end)
     d = agent.beta*(theta'*phi)' + log(p);
     logpolicy = d - logsumexp(d);
     policy = exp(logpolicy);          % softmax policy
-    a(t) = fastrandsample(policy);    % action (1) null (2) lever
-     
-    % observe reward and new state
-    [x(t), sched] = habitWorld(t, a, x, sched);
-    if x(t) == 2
-        rt = t;
-    end
+    lik = lik + logpolicy(a(t));
     
     value = theta'*phi;
     habit = log(p);
@@ -127,8 +151,11 @@ while t <= timeSteps(end)
     rho =  rho + agent.lrate_r*(r-rho);           % average reward update
     w = w + agent.lrate_w*rpe*phi;                       % weight update with value gradient
     g = agent.beta*phi*(1 - policy(a(t)));      % policy gradient
-    theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;      % policy weight update
-   
+    theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g/t;      % policy weight update
+    
+    if x(t) == 2    % if you just saw reward
+        k = k+1;
+    end
     %% store results
     results.a(t) = a(t);         % action
     results.x(t) = x(t);         % observation
@@ -145,57 +172,71 @@ while t <= timeSteps(end)
     
 end % while t<=timeSteps loop
 
+results.theta = theta;                         % policy weights
+results.theta = theta./nansum(theta(:));       % policy weights
+
+results.Q = Q./nansum(Q(:));                   % policy weights
+results.Ps = Ps./sum(Ps);                      % policy weights
+results.Q(isnan(results.Q(:))) = 0;
+results.Q(1:100,:) = 0;
+results.Q(20,2) = 1;
+
+% bernoulli log liklihood for each second
+% sum up nLL for each decisecond bin
+
+% Y is the action obs [1 or 0]
+% n is number of obs (1)
+% p(i) is probability of action (p_as) (changing from timestep to timestep)
+
+% p = results.pi(:,2)';
+% p(p<0.01) = 0.01;
+% p(p>0.99) = 0.99;
+% Y = input.data.session(s).training.lever_binned;       % action sequence (binned in seconds)
+% n = ones(size(Y));
+% nLL(s) = sum(Y.*log(p) + (n-Y).*log(1-p));
+
+%nLL = -sum(nLL);
+nLL = -lik;
+params
+end % habitAgent
+
+function plt
+[R,V] = blahut_arimoto(normps',results.theta,logspace(log10(0.1),log10(50),50));
+figure; hold on; 
+plot(R,V,'o-');
+xlabel('Policy complexity')
+ylabel('Average reward')
+figure; hold on; 
+plot(results.mi,results.avgr,'ko'); hold on;
+plot(results.mi(end),results.avgr(end),'ro','MarkerSize',20)
+
+plot(results.mi,results.rho,'ko'); hold on;
+plot(results.mi(end),results.rho(end),'mo','MarkerSize',20)
+
+
+[R,V] = blahut_arimoto(normps',theta,logspace(log10(0.1),log10(50),50));
+figure; hold on; 
+plot(R,V,'o-');
+xlabel('Policy complexity')
+ylabel('Average reward')
+plot(results.mi,results.avgr,'ko')
+
+
+[R,V] = blahut_arimoto(results.Ps',results.Q,logspace(log10(0.1),log10(50),50));
+figure; hold on; 
+plot(R,V,'o-');
+xlabel('Policy complexity')
+ylabel('Average reward')
+
+
+[R,V] = blahut_arimoto(normps',results.Q,logspace(log10(0.1),log10(50),50));
+figure; hold on; 
+plot(R,V,'o-');
+xlabel('Policy complexity')
+ylabel('Average reward')
+
+%R_data(b) = results.mi(t);
+%V_data(b) = results.rho;
 end
 
-function habitSimulateOld(params,input)
-% INPUT: params - model parameters
-%        input - data
-%
-% use the data to fix:
-% (1) total timesteps
-% (2) the reward times / number of actions until reward
-% each session separately (bc diff rats)
 
-sched = input.sched;
-
-%% initialize
-agent.alpha_w = params(1);
-agent.alpha_t = params(2);
-agent.alpha_b = 1;      % only relevant for model 3 and 4
-agent.alpha_r = 0.001;
-agent.alpha_e = 0.001;
-
-
-if sched.model == 4
-    sched.beta = 0.1;             % only relevant for model 3 and 4
-    agent.acost = params(4);    % action cost
-elseif sched.model == 3
-    sched.beta = params(3);     % only relevant for model 3 and 4
-    agent.acost = params(4);    % action cost
-elseif sched.model == 2
-    sched.beta = 1;     % only relevant for model 3 and 4
-    agent.acost = params(3);    % action cost
-end
-
-
-sched.cmax = 100;           % max complexity
-sched.k = 1;
-sched.sessnum = 20;
-sched.devalsess = [2 10 20];
-sched.testWin = 300;
-results = habitAgentFit(sched, agent, input.data);
-
-win = 100;
-for s  = 1:sched.sessnum
-    results(s).actRate = sum(results(s).a(1:results(s).sched.trainEnd)==2)/results(s).sched.trainEnd;
-    results(s).outRate = sum(results(s).x(1:results(s).sched.trainEnd)==2)/results(s).sched.trainEnd;
-    results(s).avgBeta = mean(results(s).beta(1:results(s).sched.trainEnd));
-    results(s).movOutRate = movmean(results(s).x-1, win,'Endpoints','shrink');
-    results(s).movActRate = movmean(results(s).a-1, win,'Endpoints','shrink');
-    
-    if ismember(s,sched.devalsess)
-        results(s).postTestRate = sum(results(s).a(results(s).sched.devalEnd:end)==2)/sched.testWin;
-    end
-end
-
-end

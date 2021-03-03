@@ -190,7 +190,7 @@ switch fig
             plot([cumsum(data.timeSteps);cumsum(data.timeSteps)],repmat(ylim',1,20),'k--')
             prettyplot; axis tight
             if i==1
-                subplot(4,2,sp(i,1)); 
+                subplot(4,2,sp(i,1));
                 ylabel('lever press rate (/sec)')
                 xlabel('time (s)')
                 subplot(4,2,sp(i,2));
@@ -198,6 +198,53 @@ switch fig
             end
             
         end % each schedule
+        
+    case 'sim_rat'
+        % individual rat / simulate
+        for sch = 1:length(type)
+            for r = 1:length(schedule(sch).rat)
+                data = schedule(sch).rat(r);
+                
+                sched.type = type{sch};
+                sched.R = 20; sched.I = 45;
+                
+                input.sched = sched;
+                input.timeSteps = cumsum(data.timeSteps);
+                
+                % plot single rat data
+                example_rat(sch,r)
+                
+                % load fitted parameters
+                load(strcat('sch',num2str(sch),'_r',num2str(r),'.mat'))
+                
+                % simulate data
+                results = habitSimulate(params,input);
+                a = results.a-1;
+                x = results.x-1;
+                
+                win = 100; % # seconds moving window
+                figure; hold on;
+                subplot 211; hold on;
+                plot(movmean(a, win,'Endpoints','shrink'),'LineWidth',1.5,'Color',map(sch,:))
+                ylabel('lever press rate (/sec)')
+                prettyplot; axis tight
+                
+                
+                subplot 212; hold on;
+                plot(movmean(x, win,'Endpoints','shrink'),'LineWidth',1.5,'Color',map(sch,:))
+                prettyplot; axis tight
+                xlabel('time (s)')
+                ylabel('reward rate (/sec)')
+                
+                
+                figure; hold on;
+                %plot(results.mi,results.avgr,'ko'); hold on;
+                plot(results.mi(end),results.avgr(end),'r.','MarkerSize',30)
+                xlabel('Policy complexity')
+                ylabel('Average reward')
+            end
+        end
+        
 end
 
 

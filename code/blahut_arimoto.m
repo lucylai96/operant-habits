@@ -1,4 +1,4 @@
-function [R,V,Pa] = blahut_arimoto_operant(Ps,Q,b)
+function [R,V,Pa] = blahut_arimoto(Ps,Q,b)
 
 % Blahut-Arimoto algorithm applied to the reward-complexity trade-off.
 %

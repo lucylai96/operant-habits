@@ -57,7 +57,7 @@ w = zeros(length(phi),1);      % value weights
 rho = 0;                       % avg reward init
 ecost = 0;
 ps = zeros(size(phi));
-p = [0.8 0.2];                                 % p(a) init
+p = [0.5 0.5];                                 % p(a) init
 
 sched.k = 1;
 sched.setrew = 0;
@@ -67,20 +67,18 @@ sched.devalWin = 0;  sched.testWin = 300;
 %deval = zeros(1,timeSteps);                       % a vector indicating when devaluation manipulation "turns on"
 %test = zeros(1,timeSteps);                        % a vector indicating when extinction test "turns on"
 
-a = 2;
-x = 2;
 k = 1;
-t = 2;
-rt = 1;
+t = 1;
 lik = 0;
 
 Ps = zeros(size(phi));
 Q = zeros(length(phi),2);
+rt = [1 find(input.x==1)];% reward times;
 while t <= timeSteps(end)
     
     %% define features
-    na = sum(a(rt:t-1)==2)+1; % number of actions since last reward
-    nt = t-rt+1;           % timesteps since last reward
+    na = sum(a(rt(k):t)==2)+1; % number of actions since last reward
+    nt = t-rt(k)+1;           % timesteps since last reward
     
     if nt>nS % a fix for conditions where the time / number of actions exceeds the number of features (rare)
         nt = nS;
@@ -90,6 +88,14 @@ while t <= timeSteps(end)
         na = nS;
     end
     
+    % discrete noiseless state visits
+    Ps(na) = Ps(na) +1;
+    Ps(100+nt) = Ps(100+nt) +1;
+    
+    % discrete Q values
+    Q(na,a(t)) = Q(na,a(t))+[x(t)-1];
+    Q(100+nt,a(t)) = Q(100+nt,a(t))+[x(t)-1];
+    
     phi0 = phi;
     phi(:,1) = [Adt(:,na); Tdt(:,nt)]; % features composed of indexed by action na and time t since last reward
     
@@ -97,13 +103,10 @@ while t <= timeSteps(end)
     d = agent.beta*(theta'*phi)' + log(p);
     logpolicy = d - logsumexp(d);
     policy = exp(logpolicy);          % softmax policy
-    a(t) = fastrandsample(policy);    % action (1) null (2) lever
+    a( = 
      
     % observe reward and new state
     [x(t), sched] = habitWorld(t, a, x, sched);
-    if x(t) == 2
-        rt = t;
-    end
     
     value = theta'*phi;
     habit = log(p);
@@ -127,8 +130,11 @@ while t <= timeSteps(end)
     rho =  rho + agent.lrate_r*(r-rho);           % average reward update
     w = w + agent.lrate_w*rpe*phi;                       % weight update with value gradient
     g = agent.beta*phi*(1 - policy(a(t)));      % policy gradient
-    theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;      % policy weight update
-   
+    theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g/t;      % policy weight update
+    
+    if x(t) == 2    % if you just saw reward
+        k = k+1;
+    end
     %% store results
     results.a(t) = a(t);         % action
     results.x(t) = x(t);         % observation

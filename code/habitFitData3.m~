@@ -55,7 +55,8 @@ for sch = 1:length(type)
         % fit 1 beta for all days
         for f = 1 % fit every subject 5 times w/ random x0s
             x0 = [rand*0.05  rand*0.05 rand*0.05 1+rand*10];
-            x0 =  [0.0028    0.0002    0.0197    1.4178]
+            x0 =  [ 0.0007    0.0001    0.0345    1.4427
+]
             [params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 1],[.05 .05 .5 15],[0.001 0.0001 0.001 1],[.05 .05 .3 10],[],opts,input);
         end  % number of fit iterations
         
@@ -72,7 +73,7 @@ for sch = 1:length(type)
         %                 [params(f,:),error(f)] = bads(@model, x0, [0.0001 0.0001 0.001 0.001],[.01 .01 .5 .5],[0.0001 0.0001 0.001 0.001],[.001 .001 .3 .3],[],[],input);
         %             end  % number of fit iterations
         %         end
-        save(strcat('sch',num2str(sch),'_r',num2str(r),'.mat'),'params','error'); % save by rat #
+        save(strcat(sched.type,'_params_s',num2str(r),'.mat'),'params','error'); % save by rat #
         
     end % each rat
     

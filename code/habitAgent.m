@@ -195,7 +195,7 @@ for s = 1:sched.sessnum
         %pas(2:end,:) = exp(theta(2:end,:));
         %pas = pas./sum(pas,2);
         
-        dd = agent.beta*(theta.*phi) + log(p);
+        dd = agent.beta*(theta) + log(p);
         pas = exp(dd - logsumexp(dd,2));
         
         ps = ps + phi;
@@ -221,8 +221,6 @@ for s = 1:sched.sessnum
             end
         end
         
-        %% avg reward update
-        rho0 = rho;
         rho =  rho + agent.lrate_r*(r-rho);           % average reward update
         
         if test(t) == 0 % only update if not in test mode
@@ -232,7 +230,7 @@ for s = 1:sched.sessnum
             
             %% policy update
             g = agent.beta*phi*(1 - policy(a(t)));      % policy gradient
-            theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;      % policy weight update
+            theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g/t;      % policy weight update
             
         end
         
@@ -292,11 +290,6 @@ for s = 1:sched.sessnum
     
     
 end % for each session
-% [R,V] = blahut_arimoto_operant(normps',theta,logspace(log10(0.1),log10(15),50));
-% figure(1); hold on; 
-% plot(R,V,'o-');
-% xlabel('Policy complexity')
-% ylabel('Average reward')
 
 end % habitAgent
 
