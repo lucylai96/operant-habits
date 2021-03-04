@@ -23,6 +23,7 @@ figure; hold on;
 subplot 211; hold on;
 plot(movmean(a, win,'Endpoints','shrink'),'LineWidth',1.5,'Color',map(sch,:))
 plot([cumsum(data.timeSteps);cumsum(data.timeSteps)],repmat(ylim',1,20),'k--')
+ylabel('lever press rate (/sec)')
 prettyplot; axis tight
 
 subplot 212; hold on;
@@ -30,7 +31,6 @@ plot(movmean(x, win,'Endpoints','shrink'),'LineWidth',1.5,'Color',map(sch,:))
 plot([cumsum(data.timeSteps);cumsum(data.timeSteps)],repmat(ylim',1,20),'k--')
 prettyplot; axis tight
 
-ylabel('lever press rate (/sec)')
 xlabel('time (s)')
 ylabel('reward rate (/sec)')
 
@@ -39,7 +39,7 @@ figure; hold on;
 cs = cumsum(a);
 plot(cs,'Color',map(sch,:),'LineWidth',2);
 xplot = find(x==1);
-line([xplot' xplot'+100]',[cs(xplot)' cs(xplot)']','LineWidth',2,'Color','k');
+%line([xplot' xplot'+100]',[cs(xplot)' cs(xplot)']','LineWidth',2,'Color','k');
 
 xlabel('time (s)')
 ylabel('cumulative # actions')

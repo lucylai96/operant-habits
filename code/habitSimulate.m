@@ -145,6 +145,10 @@ while t <= timeSteps(end)
     
 end % while t<=timeSteps loop
 
+results.normps = normps; 
+results.theta = theta;                         % policy weights
+results.theta = theta./nansum(theta(:));       % policy weights
+
 end
 
 function habitSimulateOld(params,input)

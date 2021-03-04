@@ -69,7 +69,7 @@ rho = 0;                       % avg reward init
 rho2 = 0;
 ecost = 0;
 ps = zeros(size(phi));
-
+Q = zeros(length(phi),2);
 for s = 1:sched.sessnum
     % at start of every session reset these initial values
     phi0(:,1) = [zeros(length(Adt),1); Tdt(:,1)];   % features
@@ -78,7 +78,7 @@ for s = 1:sched.sessnum
     x = 2;                                          % observation array init
     a = 1;                                          % action array init
     k = 1; na = 1; nt = 1; NA.rew(k) = na; NT.rew(k) = nt;
-    p = [0.5 0.5];                                 % p(a) init
+    p = [0.8 0.2];                                 % p(a) init
     
     k = 0; rt = 1; dI = 0; dV = 0; V = 0;
     sched.k = 1;
@@ -203,22 +203,13 @@ for s = 1:sched.sessnum
         
         mi = nansum(normps.*nansum(pas.*log(pas./p),2));  % mutual information
         
-        if deval(t) == 0 && test(t) == 0 %&& x(t)==2% only update when not in test or deval mode
-            ecost0 = ecost;
-            ecost =  ecost + agent.lrate_e * (cost - ecost);
-        end
         
         %% TD update
         r = ~test(t)*double(x(t)==2)-agent.acost*(a(t)==2);
         rpe = agent.beta*(r - rho) - cost + w'*(phi-phi0);      % reward prediction error
-        
+        Q(:,a(t)) = Q(:,a(t)) + 0.01*((phi.*(agent.beta*r-cost))-Q(:,a(t)));
         if deval(t) == 0 && test(t) == 0 %&& k>2 && x(t) == 2 % only update when not in satiation mode or in test mode
-            
-            if ecost > agent.cmax % if I> C
-                keyboard
-            else
-                %agent.beta = agent.beta + agent.lrate_b; % increase beta otherwise
-            end
+            agent.beta = agent.beta;%+ agent.lrate_b; % increase beta otherwise
         end
         
         rho =  rho + agent.lrate_r*(r-rho);           % average reward update
@@ -230,7 +221,7 @@ for s = 1:sched.sessnum
             
             %% policy update
             g = agent.beta*phi*(1 - policy(a(t)));      % policy gradient
-            theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g/t;      % policy weight update
+            theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;      % policy weight update
             
         end
         
@@ -239,17 +230,14 @@ for s = 1:sched.sessnum
             results(s).a(t) = a(t);         % action
             results(s).x(t) = x(t);         % observation
             results(s).r(t) = r;            % instantaneous reward
+            results.avgr(t) = mean(results.r);
             results(s).rho(t) = rho;        % expected reward (avg reward)
             results(s).rpe(t) = rpe;      % RPE
             
             results(s).pi_as(t,:) = policy;  % chosen policy
-            %results(s).pas(:,:,t) = pas;     % entire state-feature policy
             results(s).val(t,:) = value;
             results(s).hab(t,:) = habit;
             
-            results(s).w(t,:) = w;            % state value weights
-            results(s).theta(:,:,t) = theta;  % policy weights
-            results(s).ecost(t) = ecost;       % expected cost (avg cost)
             results(s).pa(t,:) = p;            % marginal action probability over 5 trials
             results(s).beta(t) = agent.beta;
             results(s).mi(t) = mi;
@@ -261,6 +249,8 @@ for s = 1:sched.sessnum
             results(s).ecost(t) = ecost;      % expected cost (avg cost)
             results(s).beta(t) = beta;
         end
+        
+        
         
         t = t+1;
         
@@ -287,10 +277,21 @@ for s = 1:sched.sessnum
         end
         
     end % while t<=timeSteps loop
-    
+    results.normps = normps;
+    results.Q = Q;            % state value weights
+    results.theta = theta;                         % policy weights
     
 end % for each session
 
+beta = linspace(0.1,30,50);
+%[R,V] = blahut_arimoto(results.normps',results.Q,beta);
+[R,V] = blahut_arimoto(results.normps',results.theta,beta);
+figure(100); hold on; 
+plot(R,V,'o-','LineWidth',3);
+%plot(results.mi,results.avgr,'ko'); hold on;
+%plot(results.mi(end),results.avgr(end),'r.','MarkerSize',50)
+xlabel('Policy complexity')
+ylabel('Average reward')
 end % habitAgent
 
 

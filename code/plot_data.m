@@ -237,12 +237,18 @@ switch fig
                 ylabel('reward rate (/sec)')
                 
                 
-                figure; hold on;
+                figure(100); hold on;
                 %plot(results.mi,results.avgr,'ko'); hold on;
-                plot(results.mi(end),results.avgr(end),'r.','MarkerSize',30)
+                plot(results.mi(end),results.avgr(end),'r.','MarkerSize',50)
                 xlabel('Policy complexity')
                 ylabel('Average reward')
+                
+                beta = linspace(0.1,15,50);% logspace(log10(0.1),log10(50),50)
+                [R(r,:),V(r,:)] = blahut_arimoto(results.normps',results.theta,beta);
+                
             end
+            figure; hold on;
+            plot(R,V,'o-');
         end
         
 end

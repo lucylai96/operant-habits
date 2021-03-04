@@ -22,13 +22,13 @@ clear all
 close all
 
 addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                  % various plot tools
-habitColors;
+map = habitColors;
 
 % params: [R  I  model timeSteps deval]
-% aparams: [lrate_w  lrate_th  lrate_pi  lrate_b  beta  acost  cmax]
+% aparams: [lrate_w  lrate_theta  lrate_pi  lrate_b  beta  acost  cmax]
 if nargin <1 
-    params =  [20 20 4 5000 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
-    aparams = [0.1 0.1 0.1 0.1 5 0.02 1];
+    params =  [20 20 4 7000 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
+    aparams = [0.01 0.01 0.01 0.001 3 0.01 1];
     type = {'FR','VR','FI','VI'};
 end
 run = 1; 
@@ -130,6 +130,8 @@ else
                 results(t,:) = habitAgent(sched, agent, input.data); % # schedule types x 20 sessions
             else
                 results(t,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
+                
+                
             end
         end % type
         l = legend(type)

@@ -1,4 +1,4 @@
-function nLL = habitAgentFit(params, input)
+function [nLL,results] = habitAgentFit(params, input)
 % PURPOSE: Reward-complexity in free-operant learning
 %
 % INPUTS:
@@ -25,8 +25,8 @@ function nLL = habitAgentFit(params, input)
 % unpack
 sched = input.sched;
 timeSteps = input.timeSteps;
-a = input.a + 1; a(1) = 2;  % conditioning on data (actions)
-x = input.x + 1;  % conditioning on data (rewards)
+a = input.a + 1; a(1) = 2;     % conditioning on data (actions)
+x = input.x + 1;               % conditioning on data (rewards)
 
 %% initialization
 
@@ -34,12 +34,12 @@ x = input.x + 1;  % conditioning on data (rewards)
 agent.lrate_w = params(1);
 agent.lrate_theta = params(2);
 agent.lrate_p = params(3);
-agent.beta = params(4);
+agent.lrate_b = params(4);
 
 % fixed
-agent.acost = 0.01;    % action cost
+agent.beta =  params(4);
+agent.acost = 0.01;     % action cost
 agent.lrate_r = 0.001;  % avg reward
-agent.lrate_e = 0.001;  % expected cost
 agent.cmax = 1;
 
 sched.k = 1;
@@ -79,7 +79,6 @@ theta  = zeros(length(phi),2); % policy weights
 theta(1,:) = 1;                % bias to not do anything
 w = zeros(length(phi),1);      % value weights
 rho = 0;                       % avg reward init
-ecost = 0;
 ps = zeros(size(phi));
 p = [0.8 0.2];                                 % p(a) init
 
@@ -135,16 +134,20 @@ while t <= timeSteps(end)
     normps = ps./sum(ps); % normalized state distribution
     
     mi = nansum(normps.*nansum(pas.*log(pas./p),2));  % mutual information
-    ecost =  ecost + agent.lrate_e * (cost - ecost);
+  
     
     %%  learning updates
     r = double(x(t)==2)-agent.acost*(a(t)==2);
-    rpe = agent.beta*(r - rho) - cost + w'*(phi-phi0);      % reward prediction error
-    rho =  rho + agent.lrate_r*(r-rho);           % average reward update
-    w = w + agent.lrate_w*rpe*phi;                       % weight update with value gradient
-    g = agent.beta*phi*(1 - policy(a(t)));      % policy gradient
-    theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g/t;      % policy weight update
+    Q(:,a(t)) = Q(:,a(t)) + agent.lrate_theta*(phi.*(agent.beta*r-cost)-Q(:,a(t)));
+    rpe = agent.beta*(r - rho) - cost + w'*(phi-phi0);        % reward prediction error
+    rho =  rho + agent.lrate_r*(r-rho);                       % average reward update
+    w = w + agent.lrate_w*rpe*phi;                            % weight update with value gradient
+    g = agent.beta*phi*(1 - policy(a(t)));                    % policy gradient
+    theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;  % policy weight update
     
+    %if mi < 0.5
+        agent.beta = agent.beta;% + agent.lrate_b;
+    %end
     if x(t) == 2    % if you just saw reward
         k = k+1;
     end
@@ -156,22 +159,15 @@ while t <= timeSteps(end)
     results.rho(t) = rho;        % expected reward (avg reward)
     results.pi(t,:) = policy;    % chosen policy
     results.p(t,:) = p;          % marginal action probability over 5 trials
-    results.ecost(t) = ecost;    % expected cost (avg cost)
     results.mi(t) = mi;
     results.na(t) = na;
     results.nt(t) = nt;
     t = t+1;
     
 end % while t<=timeSteps loop
-
+results.normps = normps; 
 results.theta = theta;                         % policy weights
-results.theta = theta./nansum(theta(:));       % policy weights
-
-results.Q = Q./nansum(Q(:));                   % policy weights
-results.Ps = Ps./sum(Ps);                      % policy weights
-results.Q(isnan(results.Q(:))) = 0;
-results.Q(1:100,:) = 0;
-results.Q(20,2) = 1;
+results.Q = Q;
 
 % bernoulli log liklihood for each second
 % sum up nLL for each decisecond bin
@@ -193,7 +189,17 @@ params
 end % habitAgent
 
 function plt
-[R,V] = blahut_arimoto(normps',results.theta,logspace(log10(0.1),log10(50),50));
+beta = linspace(0.1,15,50);
+[R,V] = blahut_arimoto(results.normps',results.Q,beta);
+figure; hold on; 
+plot(R,V,'r-');
+plot(results.mi,results.avgr,'ko'); hold on;
+plot(results.mi(end),results.avgr(end),'ro','MarkerSize',20)
+xlabel('Policy complexity')
+ylabel('Average reward')
+
+beta = linspace(0.1,15,50);
+[R,V] = blahut_arimoto(results.normps',results.theta./sum(results.theta,2),beta);
 figure; hold on; 
 plot(R,V,'o-');
 
