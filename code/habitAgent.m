@@ -14,8 +14,8 @@ function results = habitAgent(sched, agent, input)
 % Written by Lucy Lai (May 2020)
 
 %% initialization
+p = [0.8 0.2];          % p(a) init
 % states
-
 if (isequal(sched.type,'FR') || isequal(sched.type,'VR'))
     nS = sched.R*20; % number of features
 end
@@ -64,9 +64,7 @@ phi = phi0;
 theta  = zeros(length(phi),2); % policy weights
 theta(1,:) = 1;                % bias to not do anything
 w = zeros(length(phi),1);      % value weights
-num = 1000;                    % marginal action probability over the last num seconds
 rho = 0;                       % avg reward init
-rho2 = 0;
 ecost = 0;
 ps = zeros(size(phi));
 Q = zeros(length(phi),2);
@@ -78,7 +76,6 @@ for s = 1:sched.sessnum
     x = 2;                                          % observation array init
     a = 1;                                          % action array init
     k = 1; na = 1; nt = 1; NA.rew(k) = na; NT.rew(k) = nt;
-    p = [0.8 0.2];                                 % p(a) init
     
     k = 0; rt = 1; dI = 0; dV = 0; V = 0;
     sched.k = 1;
@@ -212,8 +209,9 @@ for s = 1:sched.sessnum
             agent.beta = agent.beta;%+ agent.lrate_b; % increase beta otherwise
         end
         
-        rho =  rho + agent.lrate_r*(r-rho);           % average reward update
-        
+        rho =  rho + agent.lrate_r*((agent.beta*r-cost)-rho);   % average reward update
+        ecost = ecost + agent.lrate_e*(cost-ecost);  
+         
         if test(t) == 0 % only update if not in test mode
             
             %% value update
@@ -233,6 +231,7 @@ for s = 1:sched.sessnum
             results.avgr(t) = mean(results.r);
             results(s).rho(t) = rho;        % expected reward (avg reward)
             results(s).rpe(t) = rpe;      % RPE
+            results(s).ecost(t) = ecost;      % expected cost (avg cost)
             
             results(s).pi_as(t,:) = policy;  % chosen policy
             results(s).val(t,:) = value;
@@ -283,15 +282,6 @@ for s = 1:sched.sessnum
     
 end % for each session
 
-beta = linspace(0.1,30,50);
-%[R,V] = blahut_arimoto(results.normps',results.Q,beta);
-[R,V] = blahut_arimoto(results.normps',results.theta,beta);
-figure(100); hold on; 
-plot(R,V,'o-','LineWidth',3);
-%plot(results.mi,results.avgr,'ko'); hold on;
-%plot(results.mi(end),results.avgr(end),'r.','MarkerSize',50)
-xlabel('Policy complexity')
-ylabel('Average reward')
 end % habitAgent
 
 

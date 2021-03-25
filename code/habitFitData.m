@@ -31,7 +31,7 @@ load('data.mat')
 %% instantiation
 type = {'FR' 'VR' 'FI' 'VI'};
 
-for sch = 1:length(type)
+for sch = 4:length(type)
     for r = 1:length(schedule(sch).rat)
         data = schedule(sch).rat(r);
         a = []; x = []; % unroll all data
@@ -50,21 +50,18 @@ for sch = 1:length(type)
         input.x = x;
         
         %% fitting
-        opts = optimset('MaxFunEvals',20, 'MaxIter',20);
+        opts = optimset('MaxFunEvals',50, 'MaxIter',100);
         
         % fit 1 beta for all days
         for f = 1 % fit every subject 5 times w/ random x0s
             % fit static beta
             x0 = [rand*0.05  rand*0.05 rand*0.05 1+rand*10];
             [params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 1],[.05 .05 .5 15],[0.001 0.0001 0.001 1],[.05 .05 .3 10],[],opts,input);
-        
-            % changing beta
-            x0 = [rand*0.05  rand*0.05 rand*0.05 rand*0.001];
-            x0 = [0.0038    0.0002    0.0224    0.0008]
-            x0 = [0.01    0.01   0.01    0.0008]
-            [params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 0.0001],[.05 .05 .5 .05],[0.001 0.0001 0.001 0.001],[.05 .05 .3 .01],[],opts,input);
-        
             
+            % changing beta
+            %x0 = [rand*0.05  rand*0.05 rand*0.05 rand*0.0001];
+            %[params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 0.00001],[.05 .05 .5 .05],[0.001 0.0001 0.001 0.0001],[.05 .05 .3 .001],[],opts,input);
+       
         end  % number of fit iterations
         
         %   x0 = 0.0002    0.0322    0.0176    3.5013

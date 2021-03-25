@@ -29,17 +29,24 @@ a = input.a + 1; a(1) = 2;     % conditioning on data (actions)
 x = input.x + 1;               % conditioning on data (rewards)
 
 %% initialization
+p = [0.8 0.2];          % p(a) init
 
 % set learning rates
 agent.lrate_w = params(1);
 agent.lrate_theta = params(2);
 agent.lrate_p = params(3);
-agent.lrate_b = params(4);
+if params(4) < 0.01
+    agent.lrate_b = params(4);
+    agent.beta =  0.01;
+else
+    agent.beta =  params(4);
+    agent.lrate_b = 0;
+end
 
 % fixed
-agent.beta =  params(4);
 agent.acost = 0.01;     % action cost
 agent.lrate_r = 0.001;  % avg reward
+agent.lrate_e = 0.001;  % exp cost
 agent.cmax = 1;
 
 sched.k = 1;
@@ -78,9 +85,9 @@ phi = phi0;
 theta  = zeros(length(phi),2); % policy weights
 theta(1,:) = 1;                % bias to not do anything
 w = zeros(length(phi),1);      % value weights
+ecost = 0;
 rho = 0;                       % avg reward init
 ps = zeros(size(phi));
-p = [0.8 0.2];                                 % p(a) init
 
 sched.k = 1;
 sched.setrew = 0;
@@ -140,14 +147,14 @@ while t <= timeSteps(end)
     r = double(x(t)==2)-agent.acost*(a(t)==2);
     Q(:,a(t)) = Q(:,a(t)) + agent.lrate_theta*(phi.*(agent.beta*r-cost)-Q(:,a(t)));
     rpe = agent.beta*(r - rho) - cost + w'*(phi-phi0);        % reward prediction error
-    rho =  rho + agent.lrate_r*(r-rho);                       % average reward update
+    rho =  rho + agent.lrate_r*((agent.beta*r-cost)-rho);     % average reward update
+    ecost = ecost + agent.lrate_e*(cost-ecost);               % expected policy cost update
     w = w + agent.lrate_w*rpe*phi;                            % weight update with value gradient
     g = agent.beta*phi*(1 - policy(a(t)));                    % policy gradient
     theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;  % policy weight update
     
-    %if mi < 0.5
-        agent.beta = agent.beta;% + agent.lrate_b;
-    %end
+    agent.beta = agent.beta + agent.lrate_b;
+
     if x(t) == 2    % if you just saw reward
         k = k+1;
     end
@@ -157,35 +164,20 @@ while t <= timeSteps(end)
     results.r(t) = r;            % expected reward (avg reward)
     results.avgr(t) = mean(results.r);
     results.rho(t) = rho;        % expected reward (avg reward)
-    results.pi(t,:) = policy;    % chosen policy
+    %results.pi(t,:) = policy;    % chosen policy
     results.p(t,:) = p;          % marginal action probability over 5 trials
-    results.mi(t) = mi;
-    results.na(t) = na;
-    results.nt(t) = nt;
+    %results.mi(t) = mi;
+    results.ecost(t) = ecost;
+    results.cost(t) = cost;
+    %esults.na(t) = na;
+    %results.nt(t) = nt;
     t = t+1;
     
 end % while t<=timeSteps loop
-results.normps = normps; 
-results.theta = theta;                         % policy weights
-results.Q = Q;
 
-% bernoulli log liklihood for each second
-% sum up nLL for each decisecond bin
-
-% Y is the action obs [1 or 0]
-% n is number of obs (1)
-% p(i) is probability of action (p_as) (changing from timestep to timestep)
-
-% p = results.pi(:,2)';
-% p(p<0.01) = 0.01;
-% p(p>0.99) = 0.99;
-% Y = input.data.session(s).training.lever_binned;       % action sequence (binned in seconds)
-% n = ones(size(Y));
-% nLL(s) = sum(Y.*log(p) + (n-Y).*log(1-p));
-
-%nLL = -sum(nLL);
+results.timeSteps = timeSteps;
 nLL = -lik;
-params
+params;
 end % habitAgent
 
 function plt

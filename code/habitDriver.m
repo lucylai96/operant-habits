@@ -26,12 +26,12 @@ map = habitColors;
 
 % params: [R  I  model timeSteps deval]
 % aparams: [lrate_w  lrate_theta  lrate_pi  lrate_b  beta  acost  cmax]
-if nargin <1 
-    params =  [20 20 4 7000 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
-    aparams = [0.01 0.01 0.01 0.001 3 0.01 1];
+if nargin <1
+    params =  [20 45 4 5000 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
+    aparams = [0.001 0.001 0.005 0.001 4 0.01 1];
     type = {'FR','VR','FI','VI'};
 end
-run = 1; 
+run = 1;
 sched.sessnum = 1;                  % number of sessions
 
 % agent parameters
@@ -39,7 +39,7 @@ agent.lrate_w = aparams(1);         % value learning rate
 agent.lrate_theta = aparams(2);         % policy learning rate
 agent.lrate_p = aparams(3);        % marginal policy learning rate
 agent.lrate_b = aparams(4);         % beta learning rate
-agent.beta = aparams(5);       % starting beta; high beta = low cost. beta should increase for high contingency
+agent.beta = aparams(5);           % starting beta; high beta = low cost. beta should increase for high contingency
 agent.acost = aparams(6);           % action cost
 agent.cmax = aparams(7);            % max complexity
 agent.lrate_r = 0.001;              % rho learning rate
@@ -134,11 +134,24 @@ else
                 
             end
         end % type
-        l = legend(type)
+        
+        %% plot R-C
+        figure; hold on;
+        for i = 1:4
+            %plot(results(i).mi,results(i).avgr,'.','Color',map(i,:),'MarkerSize',20); hold on;
+            %plot(results(i).mi(end),results(i).avgr(end),'ko','MarkerSize',20,'MarkerFaceColor',map(i,:))
+            %figure(101); hold on;
+            plot(results(i).ecost,results(i).avgr,'.','Color',map(i,:),'MarkerSize',20); hold on;
+            h(i,:) = plot(results(i).ecost(end),results(i).avgr(end),'ko','MarkerSize',20,'MarkerFaceColor',map(i,:))
+        end
+        xlabel('Policy complexity')
+        ylabel('Average reward')
+        l = legend(h,type);
         title(strcat('Arming parameter:',num2str(sched.R)))
         title(l,'Schedule')
         prettyplot(20)
-        save('results_all.mat','results')
+        axis([0 0.01 0 0.1])
+         save('results_all.mat','results')
     else
         load('results_all.mat')
     end
@@ -158,7 +171,7 @@ set(0, 'DefaultAxesColorOrder', map) % first three rows
 diagn = 0;
 
 %% cumulative sum plots (Fig 1)
-num = 200; % last how many # trials to look at
+num = 4000; % last how many # trials to look at
 
 figure; hold on;
 for i = 1:length(type)
@@ -166,11 +179,11 @@ for i = 1:length(type)
     if i ==2
         h(i,:) = plot(results(i).cs+5,'Color',map(i,:),'LineWidth',2);
         xplot = find(results(i).x(sched.trainEnd-num:sched.trainEnd)==2);
-        line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']'+5,'LineWidth',2,'Color','k');
+        %line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']'+5,'LineWidth',2,'Color','k');
     else
-    h(i,:) = plot(results(i).cs,'Color',map(i,:),'LineWidth',2);
-    xplot = find(results(i).x(sched.trainEnd-num:sched.trainEnd)==2);
-    line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']','LineWidth',2,'Color','k');
+        h(i,:) = plot(results(i).cs,'Color',map(i,:),'LineWidth',2);
+        xplot = find(results(i).x(sched.trainEnd-num:sched.trainEnd)==2);
+        %line([xplot' xplot'+10]',[results(i).cs(xplot)' results(i).cs(xplot)']','LineWidth',2,'Color','k');
     end
     
 end
@@ -274,12 +287,12 @@ set(gcf, 'Position',  [100, 100, 800, 1000])
 figure; hold on;
 for i = 1:length(type)
     subplot(4,1,i); hold on;
-    value_pi = 1./(1+exp(-(results(i).val(:,2) - results(i).val(:,1)))); plot(value_pi ,'b','LineWidth',2); % state-dep 
+    value_pi = 1./(1+exp(-(results(i).val(:,2) - results(i).val(:,1)))); plot(value_pi ,'b','LineWidth',2); % state-dep
     plot(results(i).pi_as(:,2),'k','LineWidth',2); % actual policy
     habit_pi = 1./(1+exp(-(results(i).hab(:,2) - results(i).hab(:,1)))); plot(habit_pi ,'r','LineWidth',2); % habit
     
-plot(results(i).pa(:,2) ,'g','LineWidth',2); % pa
-title(type{i})
+    plot(results(i).pa(:,2) ,'g','LineWidth',2); % pa
+    title(type{i})
 end
 ylabel('p(a=lever|s)')
 xlabel('time (s)')
@@ -522,66 +535,66 @@ if sched.deval == 1
     
     %% beta duration satiation (Fig 8)
     % from trainEnd to devalEnd
-%     figure; hold on; subplot 231; hold on;
-%     for i = 1:length(type)
-%         plot(results(i).rpe(sched.trainEnd+1:sched.devalEnd-1))
-%     end
-%     prettyplot
-%     ylabel('\delta_t RPE')
-%     xlabel('satiation period (s)')
-%     
-%     subplot 232; hold on;
-%     for i = 1:length(type)
-%         plot(results(i).r(sched.trainEnd+1:sched.devalEnd-1)-results(i).rho(sched.trainEnd+1:sched.devalEnd-1))
-%     end
-%     prettyplot
-%     ylabel('r-\rho')
-%     xlabel('satiation period (s)')
-%     
-%     subplot 233; hold on;
-%     for i = 1:length(type)
-%         plot((1./results(i).beta(sched.trainEnd+1:sched.devalEnd-1)).*results(i).ecost(sched.trainEnd+1:sched.devalEnd-1))
-%     end
-%     prettyplot
-%     ylabel('\beta^{-1}*E[C(\pi)]')
-%     xlabel('satiation period (s)')
-%     % plot the RPEs before and after devaluation to show that
-%     % in FR/FI, since beta is high, the (r - 1/beta * C) should be higher and
-%     % should increase theta(not press) more than in VR/VI where beta is low, so
-%     % 1/beta * C is big a
-%     
-%     % need 1/beta*C to also be higher in VR/VI > FR/FI
-%     
-%     % also, the longer you train, the more policy weights increase, more beta
-%     % increases..
-%     
-%     % from devalEnd to end
-%     subplot 234; hold on;
-%     for i = 1:length(type)
-%         plot(results(i).rpe(sched.devalEnd:end))
-%     end
-%     prettyplot
-%     ylabel('\delta_t RPE')
-%     xlabel('test period (s)')
-%     
-%     subplot 235; hold on;
-%     for i = 1:length(type)
-%         plot(results(i).r(sched.devalEnd:end)-results(i).rho(sched.devalEnd:end))
-%     end
-%     prettyplot
-%     ylabel('r-\rho')
-%     xlabel('test period (s)')
-%     
-%     subplot 236; hold on;
-%     for i = 1:length(type)
-%         plot((1./results(i).beta(sched.devalEnd:end)).*results(i).ecost(sched.devalEnd:end))
-%     end
-%     prettyplot
-%     ylabel('\beta^{-1}*E[C(\pi)]')
-%     xlabel('test period (s)')
-%     
-%     set(gcf, 'Position',  [200, 200, 800, 500])
-%     
+    %     figure; hold on; subplot 231; hold on;
+    %     for i = 1:length(type)
+    %         plot(results(i).rpe(sched.trainEnd+1:sched.devalEnd-1))
+    %     end
+    %     prettyplot
+    %     ylabel('\delta_t RPE')
+    %     xlabel('satiation period (s)')
+    %
+    %     subplot 232; hold on;
+    %     for i = 1:length(type)
+    %         plot(results(i).r(sched.trainEnd+1:sched.devalEnd-1)-results(i).rho(sched.trainEnd+1:sched.devalEnd-1))
+    %     end
+    %     prettyplot
+    %     ylabel('r-\rho')
+    %     xlabel('satiation period (s)')
+    %
+    %     subplot 233; hold on;
+    %     for i = 1:length(type)
+    %         plot((1./results(i).beta(sched.trainEnd+1:sched.devalEnd-1)).*results(i).ecost(sched.trainEnd+1:sched.devalEnd-1))
+    %     end
+    %     prettyplot
+    %     ylabel('\beta^{-1}*E[C(\pi)]')
+    %     xlabel('satiation period (s)')
+    %     % plot the RPEs before and after devaluation to show that
+    %     % in FR/FI, since beta is high, the (r - 1/beta * C) should be higher and
+    %     % should increase theta(not press) more than in VR/VI where beta is low, so
+    %     % 1/beta * C is big a
+    %
+    %     % need 1/beta*C to also be higher in VR/VI > FR/FI
+    %
+    %     % also, the longer you train, the more policy weights increase, more beta
+    %     % increases..
+    %
+    %     % from devalEnd to end
+    %     subplot 234; hold on;
+    %     for i = 1:length(type)
+    %         plot(results(i).rpe(sched.devalEnd:end))
+    %     end
+    %     prettyplot
+    %     ylabel('\delta_t RPE')
+    %     xlabel('test period (s)')
+    %
+    %     subplot 235; hold on;
+    %     for i = 1:length(type)
+    %         plot(results(i).r(sched.devalEnd:end)-results(i).rho(sched.devalEnd:end))
+    %     end
+    %     prettyplot
+    %     ylabel('r-\rho')
+    %     xlabel('test period (s)')
+    %
+    %     subplot 236; hold on;
+    %     for i = 1:length(type)
+    %         plot((1./results(i).beta(sched.devalEnd:end)).*results(i).ecost(sched.devalEnd:end))
+    %     end
+    %     prettyplot
+    %     ylabel('\beta^{-1}*E[C(\pi)]')
+    %     xlabel('test period (s)')
+    %
+    %     set(gcf, 'Position',  [200, 200, 800, 500])
+    %
 else
     %% probability of action (learned policy weights)
     if length(type) == 4 % if doing all 4 schedules at once
@@ -634,7 +647,7 @@ end
 % end
 % subplot(2,4,1); hold on;
 % ylabel('state value')
-% 
+%
 % for i = 1:length(type)
 %     subplot(2,4,i+4); hold on;
 %     plot(squeeze(results(i).theta(1,2,:)-results(i).theta(1,1,:)),'r');
