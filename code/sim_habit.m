@@ -1,5 +1,6 @@
 function results = sim_habit(params,sch,r)
 % simulate data with parameters using the actual conditions of the data
+% (reward & taps)
 
 if nargin <1
     params = [0.001, 0.001, 0.001, 2];

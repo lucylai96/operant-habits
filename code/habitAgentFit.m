@@ -32,22 +32,17 @@ x = input.x + 1;               % conditioning on data (rewards)
 p = [0.8 0.2];          % p(a) init
 
 % set learning rates
-agent.lrate_w = params(1);
-agent.lrate_theta = params(2);
-agent.lrate_p = params(3);
-if params(4) < 0.01
-    agent.lrate_b = params(4);
-    agent.beta =  0.01;
-else
-    agent.beta =  params(4);
-    agent.lrate_b = 0;
-end
+agent.beta = params(1);
+agent.lrate_beta = params(2);
+agent.lrate_w = params(3);
+agent.lrate_theta = params(4);
+agent.lrate_p = params(5);
 
 % fixed
+agent.C = 1;
 agent.acost = 0.01;     % action cost
 agent.lrate_r = 0.001;  % avg reward
 agent.lrate_e = 0.001;  % exp cost
-agent.cmax = 1;
 
 sched.k = 1;
 sched.deval = 0;
@@ -97,19 +92,17 @@ sched.devalWin = 0;  sched.testWin = 300;
 %deval = zeros(1,timeSteps);                       % a vector indicating when devaluation manipulation "turns on"
 %test = zeros(1,timeSteps);                        % a vector indicating when extinction test "turns on"
 
-k = 1; 
+k = 1;
 t = 1;
 lik = 0;
 
-Ps = zeros(size(phi));
-Q = zeros(length(phi),2);
 rt = [1 find(input.x==1)];% reward times;
 while t <= timeSteps(end)
     
     %% define features
-    na = sum(a(rt(k):t)==2)+1; % number of actions since last reward 
+    na = sum(a(rt(k):t)==2)+1; % number of actions since last reward
     nt = t-rt(k)+1;           % timesteps since last reward
-
+    
     if nt>nS % a fix for conditions where the time / number of actions exceeds the number of features (rare)
         nt = nS;
     end
@@ -127,63 +120,60 @@ while t <= timeSteps(end)
     policy = exp(logpolicy);          % softmax policy
     lik = lik + logpolicy(a(t));
     
-    value = theta'*phi;
-    habit = log(p);
-    
     cost = logpolicy(a(t)) - log(p(a(t)));                  % policy complexity cost
     p = p + agent.lrate_p*(policy - p); p = p./nansum(p);   % marginal policy update
     
-    %% policy complexity
-    dd = agent.beta*(theta) + log(p);
-    pas = exp(dd - logsumexp(dd,2));
-    
-    ps = ps + phi;
-    normps = ps./sum(ps); % normalized state distribution
-    
-    mi = nansum(normps.*nansum(pas.*log(pas./p),2));  % mutual information
-  
-    
     %%  learning updates
     r = double(x(t)==2)-agent.acost*(a(t)==2);
-    Q(:,a(t)) = Q(:,a(t)) + agent.lrate_theta*(phi.*(agent.beta*r-cost)-Q(:,a(t)));
-    rpe = agent.beta*(r - rho) - cost + w'*(phi-phi0);        % reward prediction error
-    rho =  rho + agent.lrate_r*((agent.beta*r-cost)-rho);     % average reward update
-    ecost = ecost + agent.lrate_e*(cost-ecost);               % expected policy cost update
+    rpe = agent.beta*r - rho - cost + w'*(phi-phi0);      % reward prediction error
+    rho =  rho + agent.lrate_r*((agent.beta*r-cost)-rho);   % average reward update
+    ecost = ecost + agent.lrate_e*(cost-ecost);
+    
     w = w + agent.lrate_w*rpe*phi;                            % weight update with value gradient
     g = agent.beta*phi*(1 - policy(a(t)));                    % policy gradient
     theta(:,a(t)) = theta(:,a(t)) + agent.lrate_theta*rpe*g;  % policy weight update
     
-    agent.beta = agent.beta + agent.lrate_b;
-
+    if agent.lrate_beta > 0
+        agent.beta = agent.beta + agent.lrate_beta*(agent.C-ecost)*((theta(:,a(t))'*phi)-((theta'*phi)'*policy'));
+        agent.beta = max(min(agent.beta,50),0.01);
+    end
+    
+    if agent.lrate_p > 0
+        p = p + agent.lrate_p*(policy - p); p = p./sum(p);                                  % marginal update
+    end
+    
     if x(t) == 2    % if you just saw reward
         k = k+1;
     end
     %% store results
     results.a(t) = a(t);         % action
     results.x(t) = x(t);         % observation
-    results.r(t) = r;            % expected reward (avg reward)
+    results.r(t) = r;            % instantaneous reward
     results.avgr(t) = mean(results.r);
     results.rho(t) = rho;        % expected reward (avg reward)
-    %results.pi(t,:) = policy;    % chosen policy
-    results.p(t,:) = p;          % marginal action probability over 5 trials
-    %results.mi(t) = mi;
-    results.ecost(t) = ecost;
-    results.cost(t) = cost;
-    %esults.na(t) = na;
-    %results.nt(t) = nt;
+    results.ecost(t) = ecost;    % expected cost (avg cost)
+    
+    results.policy(t,:) = policy;  % chosen policy
+    
+    results.beta(t) = agent.beta;
     t = t+1;
     
 end % while t<=timeSteps loop
 
+
 results.timeSteps = timeSteps;
 nLL = -lik;
-params;
+
+if isnan(nLL)
+    keyboard
+end
+params
 end % habitAgent
 
 function plt
 beta = linspace(0.1,15,50);
 [R,V] = blahut_arimoto(results.normps',results.Q,beta);
-figure; hold on; 
+figure; hold on;
 plot(R,V,'r-');
 plot(results.mi,results.avgr,'ko'); hold on;
 plot(results.mi(end),results.avgr(end),'ro','MarkerSize',20)
@@ -192,10 +182,10 @@ ylabel('Average reward')
 
 beta = linspace(0.1,15,50);
 [R,V] = blahut_arimoto(results.normps',results.theta./sum(results.theta,2),beta);
-figure; hold on; 
+figure; hold on;
 plot(R,V,'o-');
 
-figure; hold on; 
+figure; hold on;
 plot(results.mi,results.avgr,'ko'); hold on;
 plot(results.mi(end),results.avgr(end),'ro','MarkerSize',20)
 xlabel('Policy complexity')
@@ -206,7 +196,7 @@ plot(results.mi(end),results.rho(end),'mo','MarkerSize',20)
 
 
 [R,V] = blahut_arimoto(normps',theta,logspace(log10(0.1),log10(50),50));
-figure; hold on; 
+figure; hold on;
 plot(R,V,'o-');
 xlabel('Policy complexity')
 ylabel('Average reward')
@@ -214,14 +204,14 @@ plot(results.mi,results.avgr,'ko')
 
 
 [R,V] = blahut_arimoto(results.Ps',results.Q,logspace(log10(0.1),log10(50),50));
-figure; hold on; 
+figure; hold on;
 plot(R,V,'o-');
 xlabel('Policy complexity')
 ylabel('Average reward')
 
 
 [R,V] = blahut_arimoto(normps',results.Q,logspace(log10(0.1),log10(50),50));
-figure; hold on; 
+figure; hold on;
 plot(R,V,'o-');
 xlabel('Policy complexity')
 ylabel('Average reward')

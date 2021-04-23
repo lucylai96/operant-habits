@@ -15,6 +15,7 @@ function results = habitAgent(sched, agent, input)
 
 %% initialization
 p = [0.8 0.2];          % p(a) init
+
 % states
 if (isequal(sched.type,'FR') || isequal(sched.type,'VR'))
     nS = sched.R*20; % number of features
@@ -62,7 +63,7 @@ end
 phi0 = [Adt(:,1); Tdt(:,1)];   % features
 phi = phi0;
 theta  = zeros(length(phi),2); % policy weights
-theta(1,:) = 1;                % bias to not do anything
+%theta(1,1) = 1;                % bias to not do anything
 w = zeros(length(phi),1);      % value weights
 rho = 0;                       % avg reward init
 ecost = 0;
@@ -115,7 +116,7 @@ for s = 1:sched.sessnum
     end
     
     t = 2;
-    
+    c = 0;
     while t <= timeSteps
         if sched.deval == 1 && (t == sched.devalEnd || t == sched.trainEnd) % reinit after test period begins
             rt = t;
@@ -157,27 +158,21 @@ for s = 1:sched.sessnum
         habit = log(p);
         
         cost = logpolicy(a(t)) - log(p(a(t)));                        % policy complexity cost
-        
-        if exist('input') == 1 && t<=length(input.session(s).training.lever_binned) % if fitting to data, condition on data
-            a(t) = input.session(s).training.lever_binned(t)+1;                     % 1 means nothing, 2 means lever press
-            x(t) = input.session(s).training.reward_binned(t)+1;                    % 1 means nothing, 2 means reward
-        elseif deval(t)==1 % satiation manipulation
-            a(t) = 1;
-            x(t) = 2;
-        else
-            if  exist('input') == 1 && (sched.deval == 0 || test(t)==1) % extinction for the valued case
-                x(t) = 1;
-            else
-                % observe reward and new state
-                [x(t), sched] = habitWorld(t, a, x, sched);
-            end
+        if cost > 0.1
+            c = c+1;
         end
+        [x(t), sched] = habitWorld(t, a, x, sched); % observe reward and new state
+        
+        %         if deval(t)==1 % satiation manipulation
+        %             a(t) = 1;
+        %             x(t) = 2;
+        %         elseif exist('input') == 1 && (sched.deval == 0 || test(t)==1) % extinction for the valued case
+        %                 x(t) = 1;
+        %         end
         
         % reward counter (clean this up)
         if x(t) == 2    % if you just saw reward
-            k = k+1;    % counter for # rewards
             rt = t;     % log the timestep of last reward
-            RT(k) = rt; % counter for reward times
         end
         
         %% action history
@@ -185,37 +180,25 @@ for s = 1:sched.sessnum
             p = p + agent.lrate_p*(policy - p); p = p./nansum(p);        % marginal update
         end
         
-        %% policy complexity
-        % should encompass all states and actions (entire policy)
-        %pas = zeros(size(theta));
-        %pas(1,:) = exp(theta(1,:).*phi(1,:));
-        %pas(2:end,:) = exp(theta(2:end,:));
-        %pas = pas./sum(pas,2);
-        
-        dd = agent.beta*(theta) + log(p);
-        pas = exp(dd - logsumexp(dd,2));
-        
-        ps = ps + phi;
-        normps = ps./sum(ps); % normalized state distribution
-        
-        mi = nansum(normps.*nansum(pas.*log(pas./p),2));  % mutual information
-        
-        
         %% TD update
         r = ~test(t)*double(x(t)==2)-agent.acost*(a(t)==2);
-        rpe = agent.beta*(r - rho) - cost + w'*(phi-phi0);      % reward prediction error
-        Q(:,a(t)) = Q(:,a(t)) + 0.01*((phi.*(agent.beta*r-cost))-Q(:,a(t)));
-        if deval(t) == 0 && test(t) == 0 %&& k>2 && x(t) == 2 % only update when not in satiation mode or in test mode
-            agent.beta = agent.beta;%+ agent.lrate_b; % increase beta otherwise
-        end
-        
+        rpe = agent.beta*r - rho - cost + w'*(phi-phi0);      % reward prediction error
         rho =  rho + agent.lrate_r*((agent.beta*r-cost)-rho);   % average reward update
-        ecost = ecost + agent.lrate_e*(cost-ecost);  
-         
+        ecost = ecost + agent.lrate_e*(cost-ecost);
+        
         if test(t) == 0 % only update if not in test mode
             
             %% value update
             w = w + agent.lrate_w*rpe*phi;                       % weight update with value gradient
+            
+            if agent.lrate_beta > 0
+                agent.beta = agent.beta + agent.lrate_beta*(agent.C-ecost)*((theta(:,a(t))'*phi)-((theta'*phi)'*policy'));
+                agent.beta = max(min(agent.beta,50),0);
+            end
+            
+            if agent.lrate_p > 0
+                p = p + agent.lrate_p*(policy - p); p = p./sum(p);                                  % marginal update
+            end
             
             %% policy update
             g = agent.beta*phi*(1 - policy(a(t)));      % policy gradient
@@ -224,61 +207,25 @@ for s = 1:sched.sessnum
         end
         
         %% store results
-        if exist('input') ~= 1 % if simulation mode
-            results(s).a(t) = a(t);         % action
-            results(s).x(t) = x(t);         % observation
-            results(s).r(t) = r;            % instantaneous reward
-            results.avgr(t) = mean(results.r);
-            results(s).rho(t) = rho;        % expected reward (avg reward)
-            results(s).rpe(t) = rpe;      % RPE
-            results(s).ecost(t) = ecost;      % expected cost (avg cost)
-            
-            results(s).pi_as(t,:) = policy;  % chosen policy
-            results(s).val(t,:) = value;
-            results(s).hab(t,:) = habit;
-            
-            results(s).pa(t,:) = p;            % marginal action probability over 5 trials
-            results(s).beta(t) = agent.beta;
-            results(s).mi(t) = mi;
-            results(s).cost(t) = cost;          % policy cost for the action taken C(p(a|s))
-        else % if fitting mode
-            results(s).a(t) = a(t);         % action
-            results(s).x(t) = x(t);         % observation
-            results(s).pi_as(t,:) = policy;  % chosen policy
-            results(s).ecost(t) = ecost;      % expected cost (avg cost)
-            results(s).beta(t) = beta;
-        end
+        results(s).a(t) = a(t);         % action
+        results(s).x(t) = x(t);         % observation
+        results(s).r(t) = r;            % instantaneous reward
+        results(s).avgr(t) = mean(results.r);
+        results(s).rho(t) = rho;        % expected reward (avg reward)
+        %results(s).rpe(t) = rpe;        % RPE
+        results(s).ecost(t) = ecost;    % expected cost (avg cost)
         
+        results(s).policy(t,:) = policy;  % chosen policy
+        results(s).val(t,:) = value;
+        results(s).hab(t,:) = habit;
         
+        %results(s).pa(t,:) = p;            % marginal action probability over 5 trials
+        results(s).beta(t) = agent.beta;
+        %results(s).cost(t) = cost;          % policy cost for the action taken C(p(a|s))
         
         t = t+1;
         
-        % limiting at 50 rewards (rarely used)
-        if exist('input') == 0
-            if (isequal(sched.type,'FR') || isequal(sched.type,'VR')) && sum(x==2)==50 && sched.setrew == 1
-                sched.setrew = 0;                       % only do this once, make sure "setrew" is on in the big loop
-                timeSteps = t-1;
-                if ismember(s,sched.devalsess)          % if sess ends early, start devaluation
-                    sched.timeSteps = t;
-                    sched.trainEnd = sched.timeSteps;
-                    sched.devalEnd = sched.trainEnd + sched.devalWin;
-                    
-                    timeSteps = t + sched.devalWin + sched.testWin;   % devaluation + extinction test period = 1 hr + 5 mins (3600 + 300 timeSteps)
-                    deval = zeros(1,timeSteps);                       % a vector indicating when devaluation manipulation "turns on"
-                    deval(:,sched.trainEnd:sched.devalEnd-1) = 1;     % a vector indicating when devaluation manipulation "turns on"
-                    test = zeros(1,timeSteps);                        % a vector indicating when extinction test "turns on"
-                    test(:,sched.devalEnd:end) = 1;                   % 0 means test mode
-                else
-                    test = zeros(1,timeSteps);          % a vector indicating when devaluation "turns on"
-                end
-                
-            end % if you've reached 50 rewards
-        end
-        
     end % while t<=timeSteps loop
-    results.normps = normps;
-    results.Q = Q;            % state value weights
-    results.theta = theta;                         % policy weights
     
 end % for each session
 

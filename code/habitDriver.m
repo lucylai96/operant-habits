@@ -1,49 +1,10 @@
-function [results] = habitDriver(params,type)
+function [results] = habitDriver(run)
 % PURPOSE: for simulating model behavior across all 4 operant schedules
 %
-% INPUT: params. - structure with the following fields: (and their bounds)
-%               arm - arming parameter (e.g., [2 5 10 20])
-%               model - which model is being simulated
-%                       (1 = no action cost / no policy cost,
-%                        2 = action cost only,
-%                        3 = action and fixed policy cost,
-%                        4 = action and changing policy cost)
-%               timeSteps - total number of timesteps, (in seconds)
-%               beta - tradeoff parameter, only relevant for model 3 & 4 (e.g., 0-10)
-%               cmax - max capacity / upperbound, only relevant for model 4 (e.g., 0-100)
-%               deval - whether devaluation is simulated or not (standard
-%                       protocol is 5 minutes of "test," or 300 timesteps/seconds)
-%               ac - action cost (e.g., 0-1)
+% INPUT: run - [0 1] whether to run new simulation or not
 % NOTES:
 %
 % Written by Lucy Lai (May 2020)
-
-clear all
-close all
-
-addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');                  % various plot tools
-map = habitColors;
-
-% params: [R  I  model timeSteps deval]
-% aparams: [lrate_w  lrate_theta  lrate_pi  lrate_b  beta  acost  cmax]
-if nargin <1
-    params =  [20 45 4 5000 0]; % 1800 timesteps = 30 minutes, 3600 = 1hr  % 2:4560, 5:11400  10:22800, 20:45600
-    aparams = [0.001 0.001 0.005 0.001 4 0.01 1];
-    type = {'FR','VR','FI','VI'};
-end
-run = 1;
-sched.sessnum = 1;                  % number of sessions
-
-% agent parameters
-agent.lrate_w = aparams(1);         % value learning rate
-agent.lrate_theta = aparams(2);         % policy learning rate
-agent.lrate_p = aparams(3);        % marginal policy learning rate
-agent.lrate_b = aparams(4);         % beta learning rate
-agent.beta = aparams(5);           % starting beta; high beta = low cost. beta should increase for high contingency
-agent.acost = aparams(6);           % action cost
-agent.cmax = aparams(7);            % max complexity
-agent.lrate_r = 0.001;              % rho learning rate
-agent.lrate_e = 0.001;              % policy cost learning rate
 
 % FR-20: 30 daily sessions, sessions terminated when 50 rewards were earned or 1 hour elapsed. Satiety devaluation test after sessions 2, 10, 20, and 30.
 % VR-20: same as above
@@ -53,12 +14,32 @@ agent.lrate_e = 0.001;              % policy cost learning rate
 % FR/VR 50 rewards OR 60 minutes = 3600 timesteps x 30 sessions
 % FI/VI 38 minutes = 2280 timesteps x 20 sessions
 
-%% unpack parameters
-sched.R = params(1);
-sched.I = params(2);
-model = params(3);
-timeSteps = params(4);
-deval = params(5);
+%clear all
+close all
+rng(1)
+
+addpath('/Users/lucy/Google Drive/Harvard/Projects/mat-tools');  % various plot tools
+map = habitColors;
+
+% agent parameters
+agent.C = 1;                 % max complexity
+agent.beta = 1;              % starting beta; high beta = low cost. beta should increase for high contingency
+agent.lrate_w = 0.005;       % value learning rate
+agent.lrate_theta = 0.005;   % policy learning rate
+agent.lrate_p = 0.01;        % marginal policy learning rate
+agent.lrate_beta = 1;        % beta learning rate
+agent.lrate_r = 0.001;       % rho (average reward) learning rate
+agent.lrate_e = 0.001;       % policy complexity learning rate
+agent.acost = 0.01;          % action cost
+
+% schedule parameters
+type = {'FR','VR','FI','VI'};
+sched.R = 20;
+sched.I = 45;
+sched.sessnum = 1;             % number of sessions
+model = 4;
+timeSteps = 30000;   % 1800 timesteps = 30 minutes, 3600 = 1hr  % sess2:4560, sess5:11400  sess10:22800, sesss20:456000
+deval = 0;
 
 %% using data?
 garr = 0;
@@ -97,68 +78,41 @@ else
     sched.devalEnd = sched.trainEnd;
 end
 
-if sched.sessnum > 1       % multiple sessions
+%if sched.sessnum > 1       % multiple sessions
+
+sched.devalsess = 1;
+
+if run == 1
     for t = 1:length(type) % for each iteration
         sched.type = type{t};
-        if run == 1            % run simulations for 1 type at a time
-            for i = 1:numrats  % for each iteration
-                results(i).sess = habitAgent(sched, agent); % # schedule types x 20 sessions
-            end
-            save(strcat('results',sched.type,'.mat'),'results')
-        else
-            load(strcat('results',sched.type,'.mat'),'results')
-        end
-        makePlotsSess(results, sched,type)
-    end
-    
-else
-    if run == 1                % run simulations for all types
-        sched.devalsess = 1;
-        for t = 1:length(type) % for each iteration
-            sched.type = type{t};
-            if garr ==1
-                if sched.type == 'FR'
-                    data = FR20n(1);
-                elseif sched.type == 'VR'
-                    data = VR20n(1);
-                elseif sched.type == 'FI'
-                    data = FI45n(1);
-                elseif sched.type == 'VI'
-                    data = VI45n(1);
-                end
-                input.data = data;
-                results(t,:) = habitAgent(sched, agent, input.data); % # schedule types x 20 sessions
-            else
-                results(t,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
-                
-                
-            end
-        end % type
-        
-        %% plot R-C
-        figure; hold on;
-        for i = 1:4
-            %plot(results(i).mi,results(i).avgr,'.','Color',map(i,:),'MarkerSize',20); hold on;
-            %plot(results(i).mi(end),results(i).avgr(end),'ko','MarkerSize',20,'MarkerFaceColor',map(i,:))
-            %figure(101); hold on;
-            plot(results(i).ecost,results(i).avgr,'.','Color',map(i,:),'MarkerSize',20); hold on;
-            h(i,:) = plot(results(i).ecost(end),results(i).avgr(end),'ko','MarkerSize',20,'MarkerFaceColor',map(i,:))
-        end
-        xlabel('Policy complexity')
-        ylabel('Average reward')
-        l = legend(h,type);
-        title(strcat('Arming parameter:',num2str(sched.R)))
-        title(l,'Schedule')
-        prettyplot(20)
-        axis([0 0.01 0 0.1])
-         save('results_all.mat','results')
-    else
-        load('results_all.mat')
-    end
-    makePlots(results, sched, type)
+        results(t,:) = habitAgent(sched, agent); % # schedule types x 20 sessions
+        save('results_all.mat','results')
+    end % type
+else load('results_all.mat')
+end
+%% plot R-C
+figure; hold on;
+for i = 1:4
+    %plot(results(i).mi,results(i).avgr,'.','Color',map(i,:),'MarkerSize',20); hold on;
+    %plot(results(i).mi(end),results(i).avgr(end),'ko','MarkerSize',20,'MarkerFaceColor',map(i,:))
+    %figure(101); hold on;
+    plot(results(i).ecost,results(i).avgr,'.','Color',map(i,:),'MarkerSize',20); hold on;
+    h(i,:) = plot(results(i).ecost(end),results(i).avgr(end),'ko','MarkerSize',20,'MarkerFaceColor',map(i,:))
+end
+xlabel('Policy complexity')
+ylabel('Average reward')
+l = legend(h,type);
+title(strcat('Arming parameter:', num2str(sched.R)))
+title(l,'Schedule')
+prettyplot(20)
+axis([0 0.01 0 0.1])
+
+
+%end
+
+makePlots(results, sched, type)
 end
 
-end
 function makePlots(results, sched, type)
 
 %% init color map
@@ -195,23 +149,23 @@ ylabel('cumulative # actions')
 prettyplot
 
 %% outcome and action rates over time (Fig 2)
-win = 100; % # seconds moving window
+win = 500; % # seconds moving window
 for i = 1:length(type)
     results(i).outRate = sum(results(i).x(1:sched.trainEnd)==2)/sched.trainEnd;
     results(i).actRate = sum(results(i).a(1:sched.trainEnd)==2)/sched.trainEnd;
-    results(i).value = mean(results(i).rho2(1:sched.trainEnd));
+    results(i).value = mean(results(i).rho);
     
     % moving average
     results(i).movOutRate = movmean(results(i).x-1, win,'Endpoints','shrink');
     results(i).movActRate = movmean(results(i).a-1, win,'Endpoints','shrink');
     
     % moving avg reward (includes action cost)
-    results(i).avgRew = movmean(results(i).rho2, win,'Endpoints','shrink');
+    results(i).avgRew = movmean(results(i).rho, win,'Endpoints','shrink');
     
 end
 
 figure; hold on;
-subplot(6,4,1:3); hold on;
+subplot(5,4,1:3); hold on;
 for i = 1:length(type)
     plot(results(i).movOutRate(1:sched.trainEnd-win),'LineWidth',1.5)
 end
@@ -219,28 +173,28 @@ prettyplot
 ylabel('outcome rate')
 legend([type 'devaluation' 'test'],'FontSize',15); legend('boxoff')
 
-subplot(6,4,5:7); hold on;
+subplot(5,4,5:7); hold on;
 for i = 1:length(type)
     plot(results(i).movActRate(1:sched.trainEnd-win),'LineWidth',1.5)
 end
 ylabel('action rate')
 prettyplot
 
-subplot(6,4,4); hold on;
+subplot(5,4,4); hold on;
 for i = 1:length(type)
     bar(i,results(i).outRate);
 end
 set(gca,'xtick',[1:4],'xticklabel',type)
 prettyplot
 
-subplot(6,4,8); hold on;
+subplot(5,4,8); hold on;
 for i = 1:length(type)
     bar(i,results(i).actRate);
 end
 set(gca,'xtick',[1:4],'xticklabel',type)
 prettyplot
 
-subplot(6,4,9:11); hold on;
+subplot(5,4,9:11); hold on;
 for i = 1:length(type)
     plot(results(i).avgRew(1:sched.trainEnd-win),'LineWidth',1.5)
 end
@@ -249,7 +203,7 @@ end
 ylabel('V^\pi')
 prettyplot
 
-subplot(6,4,12); hold on;
+subplot(5,4,12); hold on;
 for i = 1:length(type)
     bar(i,results(i).value);
 end
@@ -257,26 +211,18 @@ set(gca,'xtick',[1:4],'xticklabel',type)
 prettyplot
 
 %% beta and policy cost (Fig 2)
-subplot(6,4,13:15); hold on;
+subplot(5,4,13:15); hold on;
 for i = 1:length(type)
     plot(results(i).beta(1:sched.trainEnd-win),'LineWidth',1.5)
 end
 ylabel(' \beta')
 prettyplot
 
-subplot(6,4,17:19); hold on;
+subplot(5,4,17:19); hold on;
 for i = 1:length(type)
     plot(results(i).ecost(1:sched.trainEnd-win),'LineWidth',1.5)
 end
-ylabel('E[C(\pi_\theta)]')
-prettyplot
-
-subplot(6,4,21:23);  hold on;
-for i = 1:length(type)
-    plot((1./results(i).beta(1:sched.trainEnd-win)).*results(i).ecost(1:sched.trainEnd-win),'LineWidth',1.5)
-end
-ylabel('\beta^{-1} E[C(\pi_\theta)]')
-xlabel('time (s)')
+ylabel('Policy complexity')
 prettyplot
 
 set(gcf, 'Position',  [100, 100, 800, 1000])
@@ -288,10 +234,10 @@ figure; hold on;
 for i = 1:length(type)
     subplot(4,1,i); hold on;
     value_pi = 1./(1+exp(-(results(i).val(:,2) - results(i).val(:,1)))); plot(value_pi ,'b','LineWidth',2); % state-dep
-    plot(results(i).pi_as(:,2),'k','LineWidth',2); % actual policy
+    plot(results(i).policy(:,2),'k','LineWidth',2); % actual policy
     habit_pi = 1./(1+exp(-(results(i).hab(:,2) - results(i).hab(:,1)))); plot(habit_pi ,'r','LineWidth',2); % habit
     
-    plot(results(i).pa(:,2) ,'g','LineWidth',2); % pa
+    %plot(results(i).pa(:,2) ,'g','LineWidth',2); % pa
     title(type{i})
 end
 ylabel('p(a=lever|s)')
@@ -302,54 +248,6 @@ subprettyplot(4,1)
 set(gcf, 'Position',  [300, 300, 600, 800])
 
 why
-%% RPE deconstructed
-% figure; hold on;
-% subplot 411; hold on; % rpe
-% for i = 1:length(type)
-%     plot(results(i).rpe(1:sched.trainEnd-win),'LineWidth',1.5)
-% end
-% ylabel('\delta')
-% prettyplot
-%
-% subplot 412; hold on; % r-rho
-% for i = 1:length(type)
-%     plot(results(i).r(1:sched.trainEnd-win)-results(i).rho(1:sched.trainEnd-win),'LineWidth',1.5)
-% end
-% ylabel('r-\rho')
-% prettyplot
-%
-% subplot 413; hold on; % V(s')-V(s)
-% for i = 1:length(type)
-%     plot(results(i).VS(1:sched.trainEnd-win),'LineWidth',1.5)
-% end
-% ylabel('V(s`)-V(s)')
-% prettyplot
-%
-% subplot 414; hold on; % 1\beta*cost
-% for i = 1:length(type)
-%     plot((1./results(i).beta(1:sched.trainEnd-win)).*results(i).ecost(1:sched.trainEnd-win),'LineWidth',1.5)
-% end
-% ylabel('\beta^{-1} E[C(\pi_\theta)]')
-% xlabel('time (s)')
-% prettyplot
-%
-% set(gcf, 'Position',  [100, 100, 800, 1000])
-
-
-%% plot pas over time
-
-% for i = 1:length(type)
-%     figure; hold on;
-%     subplot 311; hold on;
-%     imagesc(squeeze(results(i).pas(:,2,:)))
-%     colormap(flipud(gray))
-%     set(gca,'YDir','reverse')
-%     subplot 312; hold on;
-%     plot(results(i).rpe)
-%     subplot 313; hold on;
-%     imagesc(results(i).w')
-% end
-
 
 %% action rate before and after devaluation (Fig 4)
 if sched.deval==1

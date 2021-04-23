@@ -55,12 +55,12 @@ for sch = 4:length(type)
         % fit 1 beta for all days
         for f = 1 % fit every subject 5 times w/ random x0s
             % fit static beta
-            x0 = [rand*0.05  rand*0.05 rand*0.05 1+rand*10];
-            [params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 1],[.05 .05 .5 15],[0.001 0.0001 0.001 1],[.05 .05 .3 10],[],opts,input);
+            %x0 = [rand*0.05  rand*0.05 rand*0.05 1+rand*10];
+            %[params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 1],[.05 .05 .5 15],[0.001 0.0001 0.001 1],[.05 .05 .3 10],[],opts,input);
             
             % changing beta
-            %x0 = [rand*0.05  rand*0.05 rand*0.05 rand*0.0001];
-            %[params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.0001 0.0001 0.001 0.00001],[.05 .05 .5 .05],[0.001 0.0001 0.001 0.0001],[.05 .05 .3 .001],[],opts,input);
+            x0 = [0.1+rand*1 rand*0.01  rand*0.01 rand*0.01 rand*0.01];
+            [params(f,:),error(f)] = bads(@habitAgentFit, x0, [0.1 0.001 0.001 0.001 0.001],[10 .01 .01 .01 .01],[0.1 0.001 0.001 0.001 0.001],[10 .01 .01 .01 .01],[],opts,input);
        
         end  % number of fit iterations
         
